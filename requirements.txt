@@ -1,0 +1,2 @@
+PyMuPDF==1.22.3
+pygame==2.5.2
