@@ -1,17 +1,20 @@
-#!/usr/bin/env python3
 """
-PDF Highlighter 2.0 main entry point
-Last Updated: 2025-02-22 20:39:07 UTC
+PDF Highlighter 2.0 - Main Entry Point
+Last Updated: 2025-02-22 20:46:07 UTC
 Version: 2.0.0
 """
 
 import sys
 import logging
 from pathlib import Path
-from PyQt5 import QtWidgets
 
-from .ui import MainWindow
-from .config import AppConfig
+# Add the project root directory to Python path
+project_root = str(Path(__file__).resolve().parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from src.ui import MainWindow
+from src.config import AppConfig
 
 def setup_logging():
     """Configure application logging."""
@@ -30,6 +33,8 @@ logger = setup_logging()
 def main():
     """Main application entry point."""
     try:
+        from PyQt5 import QtWidgets
+        
         app = QtWidgets.QApplication(sys.argv)
         app.setStyle('Fusion')
         
