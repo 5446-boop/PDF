@@ -2,14 +2,22 @@
 
 A modern PyQt5-based PDF viewer and highlighter application.
 
+**Version**: 2.0.0  
+**Last Updated**: 2025-02-22 20:39:07 UTC  
+**Author**: 5446-boop
+
 ## Features
 
 - Modern PyQt5-based user interface
 - PDF viewing with zoom and navigation controls
 - Text highlighting with customizable colors
-- Search functionality
+- Search functionality with highlighting
 - Sound notifications for actions
 - Keyboard shortcuts for common operations
+- Multi-page support
+- Customizable highlight colors
+- Undo/Redo functionality
+- Save/Load highlight annotations
 
 ## Requirements
 

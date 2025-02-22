@@ -1,11 +1,12 @@
 """
 PDF Highlighter 2.0 - PDF Utilities
-Last Updated: 2025-02-22
+Last Updated: 2025-02-22 20:39:07 UTC
+Version: 2.0.0
 """
 
 import fitz
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from dataclasses import dataclass
 from enum import Enum
 
@@ -28,6 +29,16 @@ class HighlightInfo:
     rect: fitz.Rect
     color: Tuple[float, float, float]
     state: HighlightState
+    metadata: Optional[Dict] = None
+
+    def __post_init__(self):
+        """Validate highlight information."""
+        if not isinstance(self.page, int) or self.page < 0:
+            raise ValueError("Page must be a non-negative integer")
+        if not isinstance(self.rect, fitz.Rect):
+            raise ValueError("rect must be a fitz.Rect instance")
+        if not all(0 <= c <= 1 for c in self.color):
+            raise ValueError("Color values must be between 0 and 1")
 
 def rgb_to_hex(rgb: Tuple[float, float, float]) -> str:
     """Convert RGB color values to hex string."""
@@ -35,21 +46,12 @@ def rgb_to_hex(rgb: Tuple[float, float, float]) -> str:
         raise ValueError("RGB values must be between 0 and 1")
     return "#%02x%02x%02x" % (int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255))
 
-def rect_area(rect: fitz.Rect) -> float:
-    """Calculate the area of a rectangle."""
-    try:
-        return max(0, rect.x1 - rect.x0) * max(0, rect.y1 - rect.y0)
-    except AttributeError as e:
-        logger.error(f"Invalid rectangle object: {e}")
-        raise PDFError("Invalid rectangle object") from e
-
-def intersection_area(rect1: fitz.Rect, rect2: fitz.Rect) -> float:
-    """Calculate the intersection area of two rectangles."""
-    try:
-        inter = rect1.intersect(rect2)
-        if inter is None:
-            return 0
-        return rect_area(inter)
-    except AttributeError as e:
-        logger.error(f"Invalid rectangle object: {e}")
-        raise PDFError("Invalid rectangle object") from e
+def hex_to_rgb(hex_color: str) -> Tuple[float, float, float]:
+    """Convert hex color string to RGB tuple."""
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) != 6:
+        raise ValueError("Invalid hex color string")
+    r = int(hex_color[:2], 16) / 255.0
+    g = int(hex_color[2:4], 16) / 255.0
+    b = int(hex_color[4:], 16) / 255.0
+    return (r, g, b)
