@@ -1,7 +1,6 @@
 import os
 import sys
 import fitz  # PyMuPDF
-import pygame
 from PyQt5 import QtWidgets, QtGui, QtCore
 from pdf_utils import rgb_to_hex
 from pdf_processor import toggle_highlight_on_page, get_occurrence_annotation_color
@@ -55,7 +54,6 @@ class MainWindow(QtWidgets.QWidget):
         super(MainWindow, self).__init__()
         self.setWindowTitle("PDF Highlighter - PyQt")
         self.resize(1000, 800)
-        pygame.mixer.init()
         
         # Variabler for PDF og annotasjonsfarge
         self.pdf_path = ""
@@ -169,7 +167,6 @@ class MainWindow(QtWidgets.QWidget):
             return
         
         # Sjekk om en annotasjon allerede finnes for forekomstene
-        from pdf_processor import get_occurrence_annotation_color
         existing_color = get_occurrence_annotation_color(page, occurrences, threshold=0.1)
         row = 0
         self.results_table.setRowCount(1)
@@ -202,7 +199,6 @@ class MainWindow(QtWidgets.QWidget):
             self.log(f"Feil ved lasting av side: {e}")
             return
         
-        from pdf_processor import toggle_highlight_on_page
         result = toggle_highlight_on_page(page, keyword, self.highlight_color, threshold=0.1)
         self.log(f"Toggle resultat: {result}")
         self.viewer.refresh()
@@ -215,9 +211,6 @@ class MainWindow(QtWidgets.QWidget):
     
     def on_result_double_click(self, row, column):
         self.toggle_highlight()
-    
-    def run(self):
-        self.show()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
