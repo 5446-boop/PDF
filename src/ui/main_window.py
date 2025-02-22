@@ -1,19 +1,10 @@
 """
 PDF Highlighter 2.0 - Main Window
-Last Updated: 2025-02-22 21:20:57 UTC
+Last Updated: 2025-02-22 21:23:20 UTC
 """
 
-import logging
-from pathlib import Path
-
-from .qt_imports import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QToolBar, QAction, QFileDialog, QMessageBox,
-    QColorDialog, QSpinBox, QLabel, QPushButton,
-    QStatusBar, QSplitter, Qt, QSize, QKeySequence
-)
-
-logger = logging.getLogger(__name__)
+# ... [previous imports remain the same]
+from .pdf_view import PDFView
 
 class MainWindow(QMainWindow):
     """Main application window."""
@@ -23,12 +14,8 @@ class MainWindow(QMainWindow):
         self.setup_window()
         self.setup_ui()
         
-    def setup_window(self):
-        """Setup window properties."""
-        self.setWindowTitle("PDF Highlighter")
-        self.resize(1200, 800)
-        self.setMinimumSize(800, 600)
-        
+    # ... [previous methods remain the same until setup_ui]
+    
     def setup_ui(self):
         """Initialize the user interface."""
         # Create central widget and layout
@@ -43,19 +30,9 @@ class MainWindow(QMainWindow):
         content_area = QWidget()
         content_layout = QVBoxLayout(content_area)
         
-        # Add PDF viewer area (placeholder for now)
-        self.pdf_area = QLabel("Drop a PDF file here or use File > Open")
-        self.pdf_area.setAlignment(Qt.AlignCenter)
-        self.pdf_area.setStyleSheet("""
-            QLabel {
-                border: 2px dashed #999;
-                border-radius: 8px;
-                padding: 20px;
-                background: #f0f0f0;
-                color: #666;
-            }
-        """)
-        content_layout.addWidget(self.pdf_area)
+        # Create PDF viewer
+        self.pdf_view = PDFView()
+        content_layout.addWidget(self.pdf_view)
         
         # Add navigation controls
         nav_panel = self.create_navigation_panel()
@@ -66,6 +43,15 @@ class MainWindow(QMainWindow):
         
         # Create status bar
         self.statusBar().showMessage("Ready")
+        
+        # Connect signals
+        self.connect_signals()
+        
+    def connect_signals(self):
+        """Connect all signals."""
+        # Connect PDF view signals
+        self.pdf_view.page_changed.connect(self.update_page_info)
+        self.pdf_view.zoom_changed.connect(self.update_zoom_info)
         
     def create_toolbar(self):
         """Create the main toolbar."""
@@ -84,21 +70,13 @@ class MainWindow(QMainWindow):
         # View actions
         zoom_in_action = QAction("Zoom In", self)
         zoom_in_action.setShortcut(QKeySequence.ZoomIn)
+        zoom_in_action.triggered.connect(self.pdf_view.zoom_in)
         toolbar.addAction(zoom_in_action)
         
         zoom_out_action = QAction("Zoom Out", self)
         zoom_out_action.setShortcut(QKeySequence.ZoomOut)
+        zoom_out_action.triggered.connect(self.pdf_view.zoom_out)
         toolbar.addAction(zoom_out_action)
-        
-        toolbar.addSeparator()
-        
-        # Highlight actions
-        highlight_action = QAction("Highlight Mode", self)
-        highlight_action.setCheckable(True)
-        toolbar.addAction(highlight_action)
-        
-        color_action = QAction("Highlight Color", self)
-        toolbar.addAction(color_action)
         
     def create_navigation_panel(self):
         """Create the page navigation panel."""
@@ -107,6 +85,7 @@ class MainWindow(QMainWindow):
         
         # Previous page button
         prev_button = QPushButton("◀ Previous")
+        prev_button.clicked.connect(self.pdf_view.previous_page)
         layout.addWidget(prev_button)
         
         # Page number
@@ -121,6 +100,7 @@ class MainWindow(QMainWindow):
         
         # Next page button
         next_button = QPushButton("Next ▶")
+        next_button.clicked.connect(self.pdf_view.next_page)
         layout.addWidget(next_button)
         
         # Add stretch to push zoom control to right
@@ -143,10 +123,9 @@ class MainWindow(QMainWindow):
         
         if file_path:
             try:
-                # For now, just show the filename
-                name = Path(file_path).name
-                self.pdf_area.setText(f"Selected: {name}")
-                self.statusBar().showMessage(f"Opened: {name}")
+                if self.pdf_view.load_document(file_path):
+                    name = Path(file_path).name
+                    self.statusBar().showMessage(f"Opened: {name}")
             except Exception as e:
                 logger.error(f"Error opening PDF: {e}")
                 QMessageBox.critical(
@@ -154,3 +133,15 @@ class MainWindow(QMainWindow):
                     "Error",
                     f"Could not open PDF file:\n{str(e)}"
                 )
+                
+    def update_page_info(self, current_page, total_pages):
+        """Update page navigation controls."""
+        self.page_spin.setEnabled(True)
+        self.page_spin.setMaximum(total_pages)
+        self.page_spin.setValue(current_page)
+        self.total_pages.setText(f"/ {total_pages}")
+        
+    def update_zoom_info(self, zoom_level):
+        """Update zoom level display."""
+        percentage = int(zoom_level * 100)
+        self.zoom_label.setText(f"{percentage}%")
