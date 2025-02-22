@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - Main Entry Point
-Last Updated: 2025-02-22 20:46:07 UTC
+Last Updated: 2025-02-22 20:48:47 UTC
 Version: 2.0.0
 """
 
@@ -14,7 +14,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.ui import MainWindow
-from src.config import AppConfig
+from src.config.settings import AppConfig
 
 def setup_logging():
     """Configure application logging."""
