@@ -1,9 +1,4 @@
 """
-PDF Highlighter 2.0 - Configuration Package
-Last Updated: 2025-02-22 20:48:47 UTC
-Version: 2.0.0
+PDF Highlighter 2.0 - Config Package
+Last Updated: 2025-02-22 20:51:52 UTC
 """
-
-from .settings import AppConfig
-
-__all__ = ['AppConfig']

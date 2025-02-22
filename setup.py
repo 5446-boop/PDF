@@ -1,25 +1,28 @@
-from setuptools import setup, find_packages
+"""
+PDF Highlighter 2.0 - Setup Script
+Last Updated: 2025-02-22 21:19:08 UTC
+"""
 
-setup(
-    name="pdf_highlighter",
-    version="2.0.0",
-    packages=find_packages(),
-    include_package_data=True,
-    install_requires=[
-        "PyQt5>=5.15.0",
-        "PyMuPDF>=1.22.3",
-        "pytest>=7.0.0",
-        "pytest-qt>=4.2.0",
-        "pytest-cov>=4.1.0",
-    ],
-    author="5446-boop",
-    description="A modern PyQt5-based PDF viewer and highlighter application",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    python_requires=">=3.8",
-    entry_points={
-        "console_scripts": [
-            "pdf-highlighter=src.main:main",
-        ],
-    },
-)
+import os
+from pathlib import Path
+
+# Create directory structure
+directories = [
+    'src',
+    'src/ui',
+    'src/config',
+]
+
+for directory in directories:
+    Path(directory).mkdir(parents=True, exist_ok=True)
+
+# Create __init__.py files
+init_files = [
+    'src/__init__.py',
+    'src/ui/__init__.py',
+    'src/config/__init__.py'
+]
+
+for init_file in init_files:
+    with open(init_file, 'w') as f:
+        f.write('"""PDF Highlighter 2.0"""\n')

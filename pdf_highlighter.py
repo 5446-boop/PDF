@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
 """
 PDF Highlighter 2.0 - Entry Point
-Last Updated: 2025-02-22 20:46:07 UTC
-Version: 2.0.0
+Last Updated: 2025-02-22 21:17:16 UTC
 """
 
-from src.main import main
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = str(Path(__file__).resolve().parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+try:
+    from src.main import main
+except ImportError as e:
+    print(f"Error: Required modules not found. Please install required packages:\npip install PyQt5 PyMuPDF\n\nOriginal error: {e}")
+    sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
