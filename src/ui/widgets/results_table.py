@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - Results Table Widget
-Last Updated: 2025-02-23 03:00:00 UTC
+Last Updated: 2025-02-23 10:38:17 UTC
 Author: 5446-boop
 """
 
@@ -15,13 +15,15 @@ class ResultsTable(QTableWidget):
 
     def setup_ui(self):
         """Initialize the table UI."""
-        self.setColumnCount(4)
-        self.setHorizontalHeaderLabels(["Page", "Color", "Highlight All", "Remove All"])
+        self.setColumnCount(5)  # Changed from 4 to 5
+        self.setHorizontalHeaderLabels(["Page", "Found", "Color", "Highlight All", "Remove All"])
         
-        self.setColumnWidth(0, 80)
-        self.setColumnWidth(1, 100)
-        self.setColumnWidth(2, 100)
-        self.setColumnWidth(3, 100)
+        # Set column widths
+        self.setColumnWidth(0, 80)   # Page
+        self.setColumnWidth(1, 80)   # Found
+        self.setColumnWidth(2, 100)  # Color
+        self.setColumnWidth(3, 100)  # Highlight All
+        self.setColumnWidth(4, 100)  # Remove All
         
         self.setSortingEnabled(True)
 

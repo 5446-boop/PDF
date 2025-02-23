@@ -154,10 +154,16 @@ class MainWindow(BaseWindow):
         """Add a search result to the table."""
         try:
             # Page number
-            page_item = QTableWidgetItem(f"{result.page_num} ({len(result.rects)})")
+            page_item = QTableWidgetItem(str(result.page_num))
             page_item.setData(Qt.UserRole, result.rects)
             page_item.setFlags(page_item.flags() & ~Qt.ItemIsEditable)
             self.results_table.setItem(row, 0, page_item)
+            
+            # Found count
+            found_count = len(result.rects)
+            found_item = QTableWidgetItem(str(found_count))
+            found_item.setFlags(found_item.flags() & ~Qt.ItemIsEditable)
+            self.results_table.setItem(row, 1, found_item)
             
             # Color status
             color_item = QTableWidgetItem()
@@ -169,16 +175,16 @@ class MainWindow(BaseWindow):
             )
             if result.annot_xrefs:
                 color_item.setData(Qt.UserRole, result.annot_xrefs)
-            self.results_table.setItem(row, 1, color_item)
+            self.results_table.setItem(row, 2, color_item)
             
             # Buttons
             highlight_btn = self.results_table.create_action_button("Highlight All")
             highlight_btn.clicked.connect(lambda: self.add_highlight(row, result.text))
-            self.results_table.setCellWidget(row, 2, highlight_btn)
+            self.results_table.setCellWidget(row, 3, highlight_btn)
             
             remove_btn = self.results_table.create_action_button("Remove All")
             remove_btn.clicked.connect(lambda: self.remove_highlight(row))
-            self.results_table.setCellWidget(row, 3, remove_btn)
+            self.results_table.setCellWidget(row, 4, remove_btn)
             
         except Exception as e:
             self.log_message(f"Error adding result to table: {e}")
@@ -188,12 +194,12 @@ class MainWindow(BaseWindow):
         """Add highlights to all instances of text on the specified page."""
         try:
             page_item = self.results_table.item(row, 0)
-            color_item = self.results_table.item(row, 1)
+            color_item = self.results_table.item(row, 2)  # Updated from 1 to 2
             
             if not page_item or not color_item:
                 return
                 
-            page_num = int(page_item.text().split()[0])
+            page_num = int(page_item.text())  # No need to split now
             rects = page_item.data(Qt.UserRole)
             
             if not color_item.data(Qt.UserRole + 1):
@@ -213,12 +219,12 @@ class MainWindow(BaseWindow):
         """Remove all highlights from the specified page."""
         try:
             page_item = self.results_table.item(row, 0)
-            color_item = self.results_table.item(row, 1)
+            color_item = self.results_table.item(row, 2)  # Updated from 1 to 2
             
             if not page_item or not color_item:
                 return
                 
-            page_num = int(page_item.text().split()[0])
+            page_num = int(page_item.text())  # No need to split now
             xrefs = color_item.data(Qt.UserRole)
             
             if xrefs and color_item.data(Qt.UserRole + 1):
