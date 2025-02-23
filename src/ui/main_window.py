@@ -202,6 +202,8 @@ class MainWindow(BaseWindow):
                     self.results_table.update_highlight_status(color_item, True, self.color_picker.get_color())
                     color_item.setData(Qt.UserRole, xrefs)
                     self.log_message(f"Added {len(rects)} highlights on page {page_num}")
+                    # Refresh the search results to show updated highlight status
+                    self.refresh_search_results()
                     
         except Exception as e:
             self.log_message(f"Error adding highlights: {e}")
@@ -224,10 +226,18 @@ class MainWindow(BaseWindow):
                     self.results_table.update_highlight_status(color_item, False)
                     color_item.setData(Qt.UserRole, None)
                     self.log_message(f"Removed all highlights on page {page_num}")
+                    # Refresh the search results to show updated highlight status
+                    self.refresh_search_results()
                     
         except Exception as e:
             self.log_message(f"Error removing highlights: {e}")
             logger.error(f"Error removing highlights: {traceback.format_exc()}")
+
+    def refresh_search_results(self):
+        """Refresh the search results to show current highlight status."""
+        current_text = self.search_input.text().strip()
+        if current_text:
+            self.search_text()
 
     def save_pdf(self):
         """Save PDF with highlights."""
