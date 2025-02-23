@@ -105,13 +105,24 @@ def create_right_panel(window):
     right_panel = QWidget()
     right_layout = QVBoxLayout(right_panel)
     
+    # Top controls layout
+    top_controls = QHBoxLayout()
+    
     # Debug checkbox
-    debug_layout = QHBoxLayout()
     window.debug_checkbox = QCheckBox("Enable Debug Logging")
     window.debug_checkbox.stateChanged.connect(window.toggle_debug)
-    debug_layout.addWidget(window.debug_checkbox)
-    debug_layout.addStretch()
-    right_layout.addLayout(debug_layout)
+    top_controls.addWidget(window.debug_checkbox)
+    
+    # Add stretch to push clear button to the right
+    top_controls.addStretch()
+    
+    # Clear log button
+    window.clear_log_btn = QPushButton("Clear Log")
+    window.clear_log_btn.clicked.connect(window.clear_log)
+    window.clear_log_btn.setFixedWidth(80)  # Set fixed width for better appearance
+    top_controls.addWidget(window.clear_log_btn)
+    
+    right_layout.addLayout(top_controls)
     
     # Log output
     window.log_output = QTextEdit()

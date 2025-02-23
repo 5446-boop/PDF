@@ -71,6 +71,13 @@ class MainWindow(BaseWindow):
             module_logger.setLevel(logging.DEBUG)
             module_logger.propagate = True
 
+    def clear_log(self):
+        """Clear the log output window."""
+        self.log_output.clear()
+        logger.info("Log cleared")
+    
+    
+    
     def setup_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle("PDF Highlighter")
