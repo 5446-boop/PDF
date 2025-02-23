@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - PDF Handler
-Last Updated: 2025-02-23 04:37:13 UTC
+Last Updated: 2025-02-23 10:22:39 UTC
 Author: 5446-boop
 """
 
@@ -118,8 +118,47 @@ class PDFHandler:
                 self.doc = original_doc
             return False
 
+    def check_existing_highlight(self, page_num: int, rect: Tuple[float, float, float, float], query: str) -> Optional[Tuple[Tuple[float, float, float], int]]:
+        """
+        Check if a highlight already exists at the given location.
+        
+        Args:
+            page_num (int): The page number to check
+            rect (Tuple[float, float, float, float]): The rectangle coordinates to check
+            query (str): The search query associated with the highlight
+            
+        Returns:
+            Optional[Tuple[Tuple[float, float, float], int]]: A tuple containing the highlight color and xref if found, None otherwise
+        """
+        try:
+            page = self.doc[page_num - 1]
+            search_rect = fitz.Rect(rect)
+            search_area = search_rect.get_area()
+
+            if search_area <= 0:
+                return None
+
+            for annot in page.annots():
+                if annot.type[0] == 8:  # Highlight annotation type
+                    annot_rect = annot.rect
+                    if search_rect.intersect(annot_rect):
+                        intersection = search_rect.intersect(annot_rect)
+                        intersection_area = intersection.get_area()
+
+                        if intersection_area > 0 and (intersection_area / search_area) > 0.5:
+                            if annot.info.get("subject") == query:
+                                color = annot.colors['stroke'] if annot.colors else (1, 1, 0)
+                                return color, annot.xref
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error checking highlight on page {page_num}: {e}")
+            return None
+
     def highlight_text(self, page_num: int, rects: List[Tuple[float, float, float, float]], 
-                       color: Tuple[float, float, float], query: str) -> List[int]:
+                      color: Tuple[float, float, float], query: str) -> List[int]:
+        """Add highlights to text on the specified page."""
         if not self.doc:
             raise PDFError("No PDF document loaded")
 
@@ -150,6 +189,7 @@ class PDFHandler:
             return None
 
     def remove_highlight(self, page_num: int, xrefs: List[int]) -> bool:
+        """Remove highlights from the specified page."""
         if not self.doc or not xrefs:
             return False
 
@@ -185,22 +225,6 @@ class PDFHandler:
         except Exception as e:
             logger.error(f"Error removing highlights: {e}")
             return False
-            
-    def reload_document(self) -> bool:
-    """Reload the current document to refresh its state."""
-    if not self.filepath:
-        return False
-    try:
-        # Store the current document path
-        current_path = self.filepath
-        # Close the current document
-        self.doc.close()
-        # Reopen the document
-        self.doc = fitz.open(current_path)
-        return True
-    except Exception as e:
-        logger.error(f"Error reloading document: {e}")
-        return False
 
     def save_and_reload(self) -> bool:
         """Save the document and reload it to ensure changes are visible."""
@@ -216,7 +240,24 @@ class PDFHandler:
             logger.error(f"Error in save_and_reload: {e}")
             return False
 
+    def reload_document(self) -> bool:
+        """Reload the current document to refresh its state."""
+        if not self.filepath:
+            return False
+        try:
+            # Store the current document path
+            current_path = self.filepath
+            # Close the current document
+            self.doc.close()
+            # Reopen the document
+            self.doc = fitz.open(current_path)
+            return True
+        except Exception as e:
+            logger.error(f"Error reloading document: {e}")
+            return False
+
     def search_text(self, query: str) -> List[SearchResult]:
+        """Search for text in the document."""
         if not self.doc:
             raise PDFError("No PDF document loaded")
         if not query:
@@ -274,6 +315,7 @@ class PDFHandler:
             raise PDFError(f"Search failed: {str(e)}")
 
     def list_annotations(self, page_num: int):
+        """List all annotations on a specific page."""
         if not self.doc:
             raise PDFError("No PDF document loaded")
         try:
