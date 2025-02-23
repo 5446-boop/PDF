@@ -1,22 +1,27 @@
 """
 PDF Highlighter 2.0 - Main Window
-Last Updated: 2025-02-23 02:58:24 UTC
+Last Updated: 2025-02-23 11:05:10 UTC
 Author: 5446-boop
 """
 
+import sys
 import logging
 import traceback
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit,
     QTextEdit, QFileDialog, QSplitter,
-    QMessageBox, QTableWidgetItem
+    QMessageBox, QTableWidgetItem,
+    QMenuBar, QMenu, QAction,
+    QCheckBox
 )
 from PyQt5.QtCore import Qt
+from src.utils.log_handler import QtLogHandler
 
 from .base_window import BaseWindow
 from .widgets.color_picker import ColorPicker
 from .widgets.results_table import ResultsTable
+from .widgets.about_dialog import AboutDialog
 from src.utils.pdf_handler import PDFHandler, PDFError
 
 logger = logging.getLogger(__name__)
@@ -25,19 +30,90 @@ class MainWindow(BaseWindow):
     def __init__(self):
         super().__init__()
         try:
+            # Initialize logging
+            self.setup_logging()
+            
             self.pdf_handler = PDFHandler()
             self.setup_ui()
-            self.log_message("Application started")
+            logger.info("Application started")
         except Exception as e:
             error_msg = f"Error initializing MainWindow: {str(e)}\n\n{traceback.format_exc()}"
             logger.error(error_msg)
             print("\nERROR:", error_msg)
             raise
 
+    def toggle_debug(self, state):
+        """Toggle debug logging for the program output."""
+        if state == Qt.Checked:
+            self.qt_log_handler.setLevel(logging.DEBUG)
+            # Use root logger to ensure all modules get the message
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.DEBUG)
+            # Log using debug level
+            logging.getLogger(__name__).debug("Debug logging enabled")
+            
+            # Ensure pdf_handler logger is at debug level
+            pdf_logger = logging.getLogger('src.utils.pdf_handler')
+            pdf_logger.setLevel(logging.DEBUG)
+        else:
+            self.qt_log_handler.setLevel(logging.INFO)
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.INFO)
+            logging.getLogger(__name__).info("Debug logging disabled")
+
+    def setup_logging(self):
+        """Setup logging configuration."""
+        # Configure root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        
+        # Clear any existing handlers
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+        
+        # Create console handler
+        console_format = logging.Formatter(
+            '[%(asctime)s UTC][%(levelname)s][%(name)s]: %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG)
+        console_handler.setFormatter(console_format)
+        root_logger.addHandler(console_handler)
+        
+        # Create Qt handler for program output
+        self.qt_log_handler = QtLogHandler()
+        self.qt_log_handler.setLevel(logging.INFO)  # Start with INFO level
+        self.qt_log_handler.new_log_message.connect(self.append_log_message)
+        root_logger.addHandler(self.qt_log_handler)
+        
+        # Explicitly set DEBUG level for all relevant loggers
+        loggers = ['src.utils.pdf_handler', 'src.ui.main_window']
+        for name in loggers:
+            logger = logging.getLogger(name)
+            logger.setLevel(logging.DEBUG)
+            logger.propagate = True
+
+    def log_message(self, message):
+        """Log a message at INFO level."""
+        logger = logging.getLogger(__name__)
+        logger.info(message)
+
+    def append_log_message(self, message):
+        """Append a message to the log output."""
+        self.log_output.append(message)
+        # Auto-scroll to the bottom
+        self.log_output.verticalScrollBar().setValue(
+            self.log_output.verticalScrollBar().maximum()
+        )
+
     def setup_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle("PDF Highlighter")
         self.setMinimumSize(1000, 800)
+        
+        # Create menu bar
+        self.create_menu_bar()
         
         # Create main widget and layout
         main_widget = QWidget()
@@ -79,20 +155,28 @@ class MainWindow(BaseWindow):
         self.color_picker = ColorPicker()
         left_layout.addWidget(self.color_picker)
         
-        # Save button
-        self.save_btn = QPushButton("Save PDF")
-        self.save_btn.clicked.connect(self.save_pdf)
-        left_layout.addWidget(self.save_btn)
-        
         left_layout.addStretch()
         
         # Create right panel (log)
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        
+        # Debug checkbox
+        debug_layout = QHBoxLayout()
+        self.debug_checkbox = QCheckBox("Enable Debug Logging")
+        self.debug_checkbox.stateChanged.connect(self.toggle_debug)
+        debug_layout.addWidget(self.debug_checkbox)
+        debug_layout.addStretch()
+        right_layout.addLayout(debug_layout)
+        
+        # Log output
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
+        right_layout.addWidget(self.log_output)
         
         # Add panels to splitter
         splitter.addWidget(left_panel)
-        splitter.addWidget(self.log_output)
+        splitter.addWidget(right_panel)
         
         # Set splitter sizes (40% left, 60% right)
         splitter.setSizes([400, 600])
@@ -103,6 +187,41 @@ class MainWindow(BaseWindow):
         # Create results table
         self.results_table = ResultsTable()
         main_layout.addWidget(self.results_table)
+
+    def create_menu_bar(self):
+        """Create the menu bar with File and About options."""
+        menubar = self.menuBar()
+        
+        # File Menu
+        file_menu = menubar.addMenu('File')
+        
+        exit_action = QAction('Exit', self)
+        exit_action.setShortcut('Ctrl+Q')
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+        
+        # About Menu (right-aligned)
+        about_menu = QMenu('Settings', self)
+        about_action = QAction('About', self)
+        about_action.triggered.connect(self.show_about_dialog)
+        about_menu.addAction(about_action)
+        
+        # Add About menu to the right side of the menu bar
+        menubar.addMenu(about_menu)
+
+    def show_about_dialog(self):
+        """Show the About dialog."""
+        about_dialog = AboutDialog(self)
+        about_dialog.exec_()
+
+    def toggle_debug(self, state):
+        """Toggle debug logging."""
+        if state == Qt.Checked:
+            logger.setLevel(logging.DEBUG)
+            self.log_message("Debug logging enabled")
+        else:
+            logger.setLevel(logging.INFO)
+            self.log_message("Debug logging disabled")
 
     def select_pdf(self):
         """Handle PDF file selection."""

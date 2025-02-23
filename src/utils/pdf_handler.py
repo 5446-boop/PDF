@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - PDF Handler
-Last Updated: 2025-02-23 10:22:39 UTC
+Last Updated: 2025-02-23 11:21:30 UTC
 Author: 5446-boop
 """
 
@@ -12,7 +12,7 @@ from typing import List, Tuple, Optional
 from pathlib import Path
 import fitz  # PyMuPDF
 
-logging.basicConfig(level=logging.DEBUG)
+# Get module-level logger
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -32,6 +32,7 @@ class PDFHandler:
     def __init__(self):
         self.doc = None
         self.filepath = None
+        logger.debug("PDFHandler initialized")
 
     def load_document(self, filepath: str) -> bool:
         try:
@@ -40,6 +41,7 @@ class PDFHandler:
 
             filepath = Path(filepath)
             if not filepath.is_file():
+                logger.error(f"File not found: {filepath}")
                 raise PDFError(f"File not found: {filepath}")
 
             self.doc = fitz.open(filepath)
@@ -49,7 +51,7 @@ class PDFHandler:
             if total_pages > 0:
                 _ = self.doc[0].get_text("text")
 
-            logger.info(f"Successfully loaded PDF with {total_pages} pages")
+            logger.debug(f"Successfully loaded PDF with {total_pages} pages")
             return True
 
         except Exception as e:
@@ -148,6 +150,7 @@ class PDFHandler:
                         if intersection_area > 0 and (intersection_area / search_area) > 0.5:
                             if annot.info.get("subject") == query:
                                 color = annot.colors['stroke'] if annot.colors else (1, 1, 0)
+                                logger.debug(f"Found existing highlight on page {page_num} with color {color}")
                                 return color, annot.xref
 
             return None
@@ -160,10 +163,12 @@ class PDFHandler:
                       color: Tuple[float, float, float], query: str) -> List[int]:
         """Add highlights to text on the specified page."""
         if not self.doc:
+            logger.error("No PDF document loaded")
             raise PDFError("No PDF document loaded")
 
         xrefs = []
         try:
+            logger.debug(f"Adding highlights on page {page_num} for query: '{query}'")
             page = self.doc[page_num - 1]
             for rect in rects:
                 annot = page.add_highlight_annot(fitz.Rect(rect))
@@ -175,8 +180,10 @@ class PDFHandler:
                     # Verify the annotation was actually added
                     if page.load_annot(annot.xref):
                         xrefs.append(annot.xref)
+                        logger.debug(f"Added highlight annotation with xref {annot.xref}")
             
             if xrefs:
+                logger.debug(f"Successfully added {len(xrefs)} highlights")
                 # Use save_and_reload instead of just save
                 if not self.save_and_reload():
                     logger.error("Failed to save and reload document after highlighting")
@@ -214,6 +221,7 @@ class PDFHandler:
                     if annot:
                         page.delete_annot(annot)
                         success = True
+                        logger.debug(f"Removed highlight with xref {xref}")
                 except Exception as e:
                     logger.error(f"Error removing highlight {xref}: {e}")
                     continue
@@ -223,7 +231,7 @@ class PDFHandler:
                 if not self.save_and_reload():
                     logger.error("Failed to save and reload document after removing highlights")
                     return False
-                logger.info(f"Successfully removed {len(highlights_to_remove)} highlights from page {page_num}")
+                logger.debug(f"Successfully removed {len(highlights_to_remove)} highlights from page {page_num}")
                 return True
 
             return success
@@ -237,6 +245,7 @@ class PDFHandler:
         if not self.filepath:
             return False
         try:
+            logger.debug("Saving and reloading document")
             # Save the document
             if not self.save():
                 return False
@@ -251,12 +260,14 @@ class PDFHandler:
         if not self.filepath:
             return False
         try:
+            logger.debug(f"Reloading document from {self.filepath}")
             # Store the current document path
             current_path = self.filepath
             # Close the current document
             self.doc.close()
             # Reopen the document
             self.doc = fitz.open(current_path)
+            logger.debug("Document successfully reloaded")
             return True
         except Exception as e:
             logger.error(f"Error reloading document: {e}")
@@ -265,19 +276,22 @@ class PDFHandler:
     def search_text(self, query: str) -> List[SearchResult]:
         """Search for text in the document."""
         if not self.doc:
+            logger.error("No PDF document loaded")
             raise PDFError("No PDF document loaded")
         if not query:
+            logger.debug("Empty search query, returning empty results")
             return []
 
         page_results = {}
         try:
-            logger.debug(f"Searching for: {query}")
+            logger.debug(f"Starting search for query: '{query}'")
             for page_num in range(len(self.doc)):
                 try:
                     page = self.doc[page_num]
                     matches = page.search_for(query)
 
                     if matches:
+                        logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
                         rects = []
                         xrefs = []
                         highlight_color = None
@@ -296,6 +310,7 @@ class PDFHandler:
                         expanded_rect.y0 = max(0, expanded_rect.y0 - 10)
                         expanded_rect.y1 = min(page.rect.height, expanded_rect.y1 + 10)
                         context = page.get_text("text", clip=expanded_rect).strip()
+                        logger.debug(f"Got context for page {page_num + 1}: '{context[:50]}...'")
 
                         result = SearchResult(
                             page_num=page_num + 1,
@@ -306,13 +321,14 @@ class PDFHandler:
                             annot_xrefs=xrefs if xrefs else None
                         )
                         page_results[page_num + 1] = result
+                        logger.debug(f"Added result for page {page_num + 1}")
 
                 except Exception as e:
                     logger.warning(f"Error processing page {page_num + 1}: {e}")
                     continue
 
             results = list(page_results.values())
-            logger.debug(f"Found matches on {len(results)} pages")
+            logger.debug(f"Search complete - found matches on {len(results)} pages")
             return results
 
         except Exception as e:
@@ -323,8 +339,10 @@ class PDFHandler:
     def list_annotations(self, page_num: int):
         """List all annotations on a specific page."""
         if not self.doc:
+            logger.error("No PDF document loaded")
             raise PDFError("No PDF document loaded")
         try:
+            logger.debug(f"Listing annotations on page {page_num}")
             page = self.doc[page_num - 1]
             annots = []
             for annot in page.annots():
@@ -334,6 +352,7 @@ class PDFHandler:
                     "rect": annot.rect,
                     "info": annot.info
                 })
+            logger.debug(f"Found {len(annots)} annotations on page {page_num}")
             return annots
         except Exception as e:
             logger.error(f"Error listing annotations on page {page_num}: {e}")
@@ -343,6 +362,7 @@ class PDFHandler:
         """Close and clean up the document."""
         try:
             if hasattr(self, 'doc') and self.doc:
+                logger.debug("Closing document")
                 self.doc.close()
             self.doc = None
             self.filepath = None
