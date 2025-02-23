@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PDF Highlighter 2.0 - Entry Point
-Last Updated: 2025-02-22 21:17:16 UTC
+Last Updated: 2025-02-23 00:45:20 UTC
 """
 
 import sys
@@ -15,7 +15,9 @@ if project_root not in sys.path:
 try:
     from src.main import main
 except ImportError as e:
-    print(f"Error: Required modules not found. Please install required packages:\npip install PyQt5 PyMuPDF\n\nOriginal error: {e}")
+    print(f"Error: Required modules not found. Please install required packages:")
+    print("pip install PyQt5 PyMuPDF")
+    print(f"\nOriginal error: {e}")
     sys.exit(1)
 
 if __name__ == "__main__":

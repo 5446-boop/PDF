@@ -1,147 +1,179 @@
 """
 PDF Highlighter 2.0 - Main Window
-Last Updated: 2025-02-22 21:23:20 UTC
+Last Updated: 2025-02-23 00:47:55 UTC
 """
 
-# ... [previous imports remain the same]
-from .pdf_view import PDFView
+from src.ui.qt_imports import (
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QColorDialog,
+    QFileDialog,
+    QSplitter,
+    Qt
+)
 
 class MainWindow(QMainWindow):
     """Main application window."""
     
     def __init__(self):
         super().__init__()
-        self.setup_window()
+        self.current_pdf_path = None
+        self.current_color = (1, 1, 0)  # Default yellow
         self.setup_ui()
         
-    # ... [previous methods remain the same until setup_ui]
-    
     def setup_ui(self):
         """Initialize the user interface."""
-        # Create central widget and layout
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+        self.setWindowTitle("PDF Highlighter")
+        self.setMinimumSize(1000, 800)
         
-        # Create toolbar
-        self.create_toolbar()
+        # Create main widget and layout
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QVBoxLayout(main_widget)
         
-        # Create main content area
-        content_area = QWidget()
-        content_layout = QVBoxLayout(content_area)
+        # Create top splitter for areas 1 and 2
+        top_splitter = QSplitter(Qt.Horizontal)
         
-        # Create PDF viewer
-        self.pdf_view = PDFView()
-        content_layout.addWidget(self.pdf_view)
+        # Area 1 - Control Panel (Top Left)
+        self.create_control_panel(top_splitter)
         
-        # Add navigation controls
-        nav_panel = self.create_navigation_panel()
-        content_layout.addWidget(nav_panel)
+        # Area 2 - Results Table (Top Right)
+        self.create_results_table(top_splitter)
         
-        # Add content area to main layout
-        layout.addWidget(content_area)
+        # Set initial sizes for the splitter (50-50 split)
+        top_splitter.setSizes([400, 400])
         
-        # Create status bar
-        self.statusBar().showMessage("Ready")
+        # Add top splitter to main layout
+        main_layout.addWidget(top_splitter)
         
-        # Connect signals
-        self.connect_signals()
+        # Area 3 - Log Output (Bottom)
+        self.create_log_panel(main_layout)
         
-    def connect_signals(self):
-        """Connect all signals."""
-        # Connect PDF view signals
-        self.pdf_view.page_changed.connect(self.update_page_info)
-        self.pdf_view.zoom_changed.connect(self.update_zoom_info)
+        # Set layout proportions (70% top, 30% bottom)
+        main_layout.setStretch(0, 70)
+        main_layout.setStretch(1, 30)
         
-    def create_toolbar(self):
-        """Create the main toolbar."""
-        toolbar = QToolBar()
-        toolbar.setIconSize(QSize(24, 24))
-        self.addToolBar(toolbar)
+    def create_control_panel(self, parent):
+        """Create the control panel (Area 1)."""
+        control_widget = QWidget()
+        layout = QVBoxLayout(control_widget)
         
-        # File actions
-        open_action = QAction("Open PDF", self)
-        open_action.setShortcut(QKeySequence.Open)
-        open_action.triggered.connect(self.open_pdf)
-        toolbar.addAction(open_action)
+        # PDF File Selection
+        file_layout = QHBoxLayout()
+        select_btn = QPushButton("Select PDF")
+        select_btn.clicked.connect(self.select_pdf)
+        file_layout.addWidget(select_btn)
         
-        toolbar.addSeparator()
+        self.path_label = QLabel("No file selected")
+        self.path_label.setWordWrap(True)
+        file_layout.addWidget(self.path_label)
+        layout.addLayout(file_layout)
         
-        # View actions
-        zoom_in_action = QAction("Zoom In", self)
-        zoom_in_action.setShortcut(QKeySequence.ZoomIn)
-        zoom_in_action.triggered.connect(self.pdf_view.zoom_in)
-        toolbar.addAction(zoom_in_action)
+        # Search Box
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Enter search text...")
+        search_layout.addWidget(self.search_input)
         
-        zoom_out_action = QAction("Zoom Out", self)
-        zoom_out_action.setShortcut(QKeySequence.ZoomOut)
-        zoom_out_action.triggered.connect(self.pdf_view.zoom_out)
-        toolbar.addAction(zoom_out_action)
+        search_btn = QPushButton("Search")
+        search_btn.clicked.connect(self.search_text)
+        search_layout.addWidget(search_btn)
+        layout.addLayout(search_layout)
         
-    def create_navigation_panel(self):
-        """Create the page navigation panel."""
-        panel = QWidget()
-        layout = QHBoxLayout(panel)
+        # Color Selection
+        color_layout = QHBoxLayout()
+        color_btn = QPushButton("Select Color")
+        color_btn.clicked.connect(self.select_color)
+        color_layout.addWidget(color_btn)
         
-        # Previous page button
-        prev_button = QPushButton("◀ Previous")
-        prev_button.clicked.connect(self.pdf_view.previous_page)
-        layout.addWidget(prev_button)
+        self.color_preview = QLabel()
+        self.color_preview.setFixedSize(24, 24)
+        self.update_color_preview()
+        color_layout.addWidget(self.color_preview)
+        layout.addLayout(color_layout)
         
-        # Page number
-        self.page_spin = QSpinBox()
-        self.page_spin.setMinimum(1)
-        self.page_spin.setEnabled(False)
-        layout.addWidget(self.page_spin)
-        
-        # Total pages label
-        self.total_pages = QLabel("/ 0")
-        layout.addWidget(self.total_pages)
-        
-        # Next page button
-        next_button = QPushButton("Next ▶")
-        next_button.clicked.connect(self.pdf_view.next_page)
-        layout.addWidget(next_button)
-        
-        # Add stretch to push zoom control to right
+        # Add stretch to push everything to the top
         layout.addStretch()
         
-        # Zoom level
-        self.zoom_label = QLabel("100%")
-        layout.addWidget(self.zoom_label)
+        parent.addWidget(control_widget)
         
-        return panel
+    def create_results_table(self, parent):
+        """Create the results table (Area 2)."""
+        self.results_table = QTableWidget()
+        self.results_table.setColumnCount(3)
+        self.results_table.setHorizontalHeaderLabels(["Page", "Text", "Color"])
+        self.results_table.itemDoubleClicked.connect(self.highlight_selected_text)
         
-    def open_pdf(self):
-        """Handle opening a PDF file."""
+        # Set column widths
+        self.results_table.setColumnWidth(0, 80)   # Page number
+        self.results_table.setColumnWidth(1, 300)  # Text
+        self.results_table.setColumnWidth(2, 100)  # Color
+        
+        parent.addWidget(self.results_table)
+        
+    def create_log_panel(self, layout):
+        """Create the log output panel (Area 3)."""
+        self.log_output = QTextEdit()
+        self.log_output.setReadOnly(True)
+        layout.addWidget(self.log_output)
+        
+    def select_pdf(self):
+        """Handle PDF file selection."""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            "Open PDF File",
+            "Select PDF File",
             "",
             "PDF Files (*.pdf);;All Files (*.*)"
         )
         
         if file_path:
-            try:
-                if self.pdf_view.load_document(file_path):
-                    name = Path(file_path).name
-                    self.statusBar().showMessage(f"Opened: {name}")
-            except Exception as e:
-                logger.error(f"Error opening PDF: {e}")
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"Could not open PDF file:\n{str(e)}"
-                )
-                
-    def update_page_info(self, current_page, total_pages):
-        """Update page navigation controls."""
-        self.page_spin.setEnabled(True)
-        self.page_spin.setMaximum(total_pages)
-        self.page_spin.setValue(current_page)
-        self.total_pages.setText(f"/ {total_pages}")
+            self.current_pdf_path = file_path
+            self.path_label.setText(str(file_path))
+            self.log_message(f"Selected PDF: {file_path}")
+            
+    def select_color(self):
+        """Handle highlight color selection."""
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.current_color = (
+                color.red() / 255.0,
+                color.green() / 255.0,
+                color.blue() / 255.0
+            )
+            self.update_color_preview()
+            self.log_message(f"Selected color: RGB{self.current_color}")
+            
+    def update_color_preview(self):
+        """Update the color preview label."""
+        r, g, b = self.current_color
+        style = f"background-color: rgb({int(r*255)}, {int(g*255)}, {int(b*255)}); border: 1px solid black;"
+        self.color_preview.setStyleSheet(style)
         
-    def update_zoom_info(self, zoom_level):
-        """Update zoom level display."""
-        percentage = int(zoom_level * 100)
-        self.zoom_label.setText(f"{percentage}%")
+    def search_text(self):
+        """Handle text search."""
+        text = self.search_input.text()
+        if not text or not self.current_pdf_path:
+            return
+            
+        self.log_message(f"Searching for: {text}")
+        # TODO: Implement actual PDF search
+        
+    def highlight_selected_text(self, item):
+        """Handle double-click on results table."""
+        row = item.row()
+        page = self.results_table.item(row, 0).text()
+        text = self.results_table.item(row, 1).text()
+        self.log_message(f"Highlighting text on page {page}: {text}")
+        # TODO: Implement actual highlighting
+        
+    def log_message(self, message: str):
+        """Add message to log output."""
+        self.log_output.append(message)
