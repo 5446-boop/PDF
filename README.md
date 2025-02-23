@@ -1,14 +1,16 @@
-# PDF Highlighter
+# PDF Highlighter 2.0
 
-A PyQt5-based PDF viewer and highlighter that allows searching and highlighting text in PDF documents.
+A powerful PyQt5-based PDF viewer and highlighter application that allows searching, highlighting, and managing text in PDF documents with an intuitive interface.
 
 ## Features
-- Load and view PDF files
-- Search for text within PDFs
-- Highlight text with custom colors
-- Remove highlights with double-click
-- Save PDFs with highlights
-- Log window for operation tracking
+- 📄 Load and view PDF files seamlessly
+- 🔍 Advanced text search capabilities
+- 🎨 Customizable highlight colors
+- ⚡ Quick highlight removal with double-click
+- 💾 Save PDFs with highlights preserved
+- 📊 Detailed logging and debug options
+- 🎯 Results table with page numbers and counts
+- ⌨️ Keyboard shortcuts for common actions
 
 ## Installation
 
@@ -23,39 +25,57 @@ cd PDF
 pip install -r requirements.txt
 ```
 
-## Usage
-
-1. Run the application:
+3. Run the application:
 ```bash
-python pdf_highlighter.py
+python src/ui/main_window.py
 ```
 
-2. Use the interface to:
-   - Select a PDF file
-   - Search for text
-   - Choose highlight colors
-   - Double-click results to toggle highlights
-   - Save the modified PDF
+## Interface Guide
+- **File Selection**: Use "Select PDF" button or Alt+S
+- **Search**: 
+  - Enter search text
+  - Click "Search" or use Alt+F
+  - Results show page numbers and match counts
+- **Highlighting**:
+  - Choose colors from the color picker
+  - Click "Highlight All" on results
+  - Double-click to remove highlights
+  - Use "Remove All" to clear highlights
+- **Logging**:
+  - Toggle debug mode for detailed logs
+  - Clear logs with "Clear Log" button
+  - Real-time operation tracking
 
 ## Requirements
 - Python 3.7+
-- PyQt5
-- PyMuPDF (fitz)
+- PyQt5 5.15+
+- PyMuPDF (fitz) 1.19+
+- pywin32 (Windows only)
 
 ## Project Structure
 ```
 PDF/
 ├── README.md           # Project documentation
 ├── requirements.txt    # Package dependencies
-├── pdf_highlighter.py  # Main entry point
 └── src/               # Source code
-    ├── ui/           # User interface components
-    └── utils/        # Utility functions and classes
+    ├── ui/            # User interface components
+    │   ├── widgets/   # Custom UI widgets
+    │   ├── main_window.py
+    │   └── ui_components.py
+    └── utils/         # Utility modules
+        ├── log_handler.py
+        └── pdf_handler.py
 ```
 
 ## Development
-- Last Updated: 2025-02-23 01:22:21 UTC
+- Version: 2.0
+- Last Updated: 2025-02-23 12:34:41 UTC
 - Author: 5446-boop
+- Language: Python (100%)
 
 ## License
-MIT License
+MIT License - See LICENSE file for details.
+
+## Contact
+- GitHub: [@5446-boop](https://github.com/5446-boop)
+- Project Link: [https://github.com/5446-boop/PDF](https://github.com/5446-boop/PDF)
