@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - Main Window
-Last Updated: 2025-02-23 11:05:10 UTC
+Last Updated: 2025-02-23 11:26:35 UTC
 Author: 5446-boop
 """
 
@@ -35,31 +35,12 @@ class MainWindow(BaseWindow):
             
             self.pdf_handler = PDFHandler()
             self.setup_ui()
-            logger.info("Application started")
+            logger.debug("Application started")
         except Exception as e:
             error_msg = f"Error initializing MainWindow: {str(e)}\n\n{traceback.format_exc()}"
             logger.error(error_msg)
             print("\nERROR:", error_msg)
             raise
-
-    def toggle_debug(self, state):
-        """Toggle debug logging for the program output."""
-        if state == Qt.Checked:
-            self.qt_log_handler.setLevel(logging.DEBUG)
-            # Use root logger to ensure all modules get the message
-            root_logger = logging.getLogger()
-            root_logger.setLevel(logging.DEBUG)
-            # Log using debug level
-            logging.getLogger(__name__).debug("Debug logging enabled")
-            
-            # Ensure pdf_handler logger is at debug level
-            pdf_logger = logging.getLogger('src.utils.pdf_handler')
-            pdf_logger.setLevel(logging.DEBUG)
-        else:
-            self.qt_log_handler.setLevel(logging.INFO)
-            root_logger = logging.getLogger()
-            root_logger.setLevel(logging.INFO)
-            logging.getLogger(__name__).info("Debug logging disabled")
 
     def setup_logging(self):
         """Setup logging configuration."""
@@ -87,17 +68,40 @@ class MainWindow(BaseWindow):
         self.qt_log_handler.new_log_message.connect(self.append_log_message)
         root_logger.addHandler(self.qt_log_handler)
         
-        # Explicitly set DEBUG level for all relevant loggers
+        # Ensure all module loggers are properly configured
         loggers = ['src.utils.pdf_handler', 'src.ui.main_window']
         for name in loggers:
-            logger = logging.getLogger(name)
-            logger.setLevel(logging.DEBUG)
-            logger.propagate = True
+            module_logger = logging.getLogger(name)
+            module_logger.setLevel(logging.DEBUG)
+            module_logger.propagate = True
+
+    def toggle_debug(self, state):
+        """Toggle debug logging for the program output."""
+        if state == Qt.Checked:
+            # Set Qt handler to DEBUG level
+            self.qt_log_handler.setLevel(logging.DEBUG)
+            # Set root logger to DEBUG
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.DEBUG)
+            # Ensure pdf_handler logger is at debug level
+            pdf_logger = logging.getLogger('src.utils.pdf_handler')
+            pdf_logger.setLevel(logging.DEBUG)
+            # Use debug level to log the change
+            logger.debug("Debug logging enabled")
+        else:
+            # Restore INFO level
+            self.qt_log_handler.setLevel(logging.INFO)
+            root_logger = logging.getLogger()
+            root_logger.setLevel(logging.INFO)
+            logger.info("Debug logging disabled")
 
     def log_message(self, message):
-        """Log a message at INFO level."""
+        """Log a message at DEBUG level for operations, INFO for user actions."""
         logger = logging.getLogger(__name__)
-        logger.info(message)
+        if "searching" in message.lower() or "loaded pdf" in message.lower():
+            logger.debug(message)
+        else:
+            logger.info(message)
 
     def append_log_message(self, message):
         """Append a message to the log output."""
@@ -214,15 +218,6 @@ class MainWindow(BaseWindow):
         about_dialog = AboutDialog(self)
         about_dialog.exec_()
 
-    def toggle_debug(self, state):
-        """Toggle debug logging."""
-        if state == Qt.Checked:
-            logger.setLevel(logging.DEBUG)
-            self.log_message("Debug logging enabled")
-        else:
-            logger.setLevel(logging.INFO)
-            self.log_message("Debug logging disabled")
-
     def select_pdf(self):
         """Handle PDF file selection."""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -236,14 +231,14 @@ class MainWindow(BaseWindow):
             try:
                 if self.pdf_handler.load_document(file_path):
                     self.path_label.setText(file_path)
-                    self.log_message(f"Loaded PDF: {file_path}")
+                    logger.debug(f"Loaded PDF: {file_path}")
                     self.results_table.setRowCount(0)
             except PDFError as e:
                 self.show_error("PDF Error", str(e))
-                self.log_message(f"Error loading PDF: {e}")
+                logger.error(f"Error loading PDF: {e}")
             except Exception as e:
                 self.show_error("Error", f"Unexpected error: {str(e)}")
-                self.log_message(f"Unexpected error: {e}")
+                logger.error(f"Unexpected error: {e}")
 
     def search_text(self):
         """Handle text search."""
@@ -252,7 +247,7 @@ class MainWindow(BaseWindow):
             self.show_error("Search Error", "Please enter search text")
             return
             
-        self.log_message(f"Searching for: {text}")
+        logger.debug(f"Starting search for: '{text}'")
         try:
             results = self.pdf_handler.search_text(text)
             self.results_table.setRowCount(0)
@@ -263,6 +258,7 @@ class MainWindow(BaseWindow):
                 self.add_result_to_table(row, result)
                 
             if not results:
+                logger.debug(f"No matches found for '{text}'")
                 self.show_error("Search Results", f"No matches found for '{text}'")
                 
         except Exception as e:
@@ -305,63 +301,65 @@ class MainWindow(BaseWindow):
             remove_btn.clicked.connect(lambda: self.remove_highlight(row))
             self.results_table.setCellWidget(row, 4, remove_btn)
             
+            logger.debug(f"Added result for page {result.page_num} with {found_count} matches")
+            
         except Exception as e:
-            self.log_message(f"Error adding result to table: {e}")
             logger.error(f"Error adding result to table: {traceback.format_exc()}")
 
     def add_highlight(self, row, text):
         """Add highlights to all instances of text on the specified page."""
         try:
             page_item = self.results_table.item(row, 0)
-            color_item = self.results_table.item(row, 2)  # Updated from 1 to 2
+            color_item = self.results_table.item(row, 2)
             
             if not page_item or not color_item:
                 return
                 
-            page_num = int(page_item.text())  # No need to split now
+            page_num = int(page_item.text())
             rects = page_item.data(Qt.UserRole)
             
             if not color_item.data(Qt.UserRole + 1):
+                logger.debug(f"Adding highlights on page {page_num} for '{text}'")
                 xrefs = self.pdf_handler.highlight_text(page_num, rects, self.color_picker.get_color(), text)
                 if xrefs:
                     self.results_table.update_highlight_status(color_item, True, self.color_picker.get_color())
                     color_item.setData(Qt.UserRole, xrefs)
-                    self.log_message(f"Added {len(rects)} highlights on page {page_num}")
+                    logger.debug(f"Added {len(rects)} highlights on page {page_num}")
                     # Refresh the search results to show updated highlight status
                     self.refresh_search_results()
                     
         except Exception as e:
-            self.log_message(f"Error adding highlights: {e}")
             logger.error(f"Error adding highlights: {traceback.format_exc()}")
 
     def remove_highlight(self, row):
         """Remove all highlights from the specified page."""
         try:
             page_item = self.results_table.item(row, 0)
-            color_item = self.results_table.item(row, 2)  # Updated from 1 to 2
+            color_item = self.results_table.item(row, 2)
             
             if not page_item or not color_item:
                 return
                 
-            page_num = int(page_item.text())  # No need to split now
+            page_num = int(page_item.text())
             xrefs = color_item.data(Qt.UserRole)
             
             if xrefs and color_item.data(Qt.UserRole + 1):
+                logger.debug(f"Removing highlights on page {page_num}")
                 if self.pdf_handler.remove_highlight(page_num, xrefs):
                     self.results_table.update_highlight_status(color_item, False)
                     color_item.setData(Qt.UserRole, None)
-                    self.log_message(f"Removed all highlights on page {page_num}")
+                    logger.debug(f"Removed all highlights on page {page_num}")
                     # Refresh the search results to show updated highlight status
                     self.refresh_search_results()
                     
         except Exception as e:
-            self.log_message(f"Error removing highlights: {e}")
             logger.error(f"Error removing highlights: {traceback.format_exc()}")
 
     def refresh_search_results(self):
         """Refresh the search results to show current highlight status."""
         current_text = self.search_input.text().strip()
         if current_text:
+            logger.debug("Refreshing search results")
             self.search_text()
 
     def save_pdf(self):
@@ -380,23 +378,27 @@ class MainWindow(BaseWindow):
         
         if reply == QMessageBox.Yes:
             try:
+                logger.debug("Saving PDF with highlights")
                 # Reload the document before saving to ensure all changes are captured
                 if self.pdf_handler.reload_document():
                     if self.pdf_handler.save_document(self.pdf_handler.filepath):
-                        self.log_message(f"Saved PDF with highlights to: {self.pdf_handler.filepath}")
+                        logger.debug(f"Successfully saved PDF to: {self.pdf_handler.filepath}")
                     else:
                         raise PDFError("Failed to save PDF")
                 else:
                     raise PDFError("Failed to reload PDF before saving")
             except Exception as e:
                 self.show_error("Save Error", str(e))
-                self.log_message(f"Error saving PDF: {e}")
+                logger.error(f"Error saving PDF: {e}")
 
     def closeEvent(self, event):
         """Handle window close event."""
         try:
+            logger.debug("Closing application")
             if self.pdf_handler:
                 self.pdf_handler.close()
-        except:
-            pass
-        super().closeEvent(event)
+            logger.debug("Application closed successfully")
+        except Exception as e:
+            logger.error(f"Error during application shutdown: {e}")
+        finally:
+            super().closeEvent(event)
