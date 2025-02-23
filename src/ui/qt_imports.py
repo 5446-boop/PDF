@@ -1,6 +1,7 @@
 """
 PDF Highlighter 2.0 - Qt Import Centralizer
-Last Updated: 2025-02-23 00:45:20 UTC
+Last Updated: 2025-02-23 01:00:37 UTC
+Author: 5446-boop
 """
 
 from PyQt5.QtWidgets import (
@@ -8,31 +9,34 @@ from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QToolBar,
-    QAction,
-    QFileDialog,
-    QMessageBox,
-    QColorDialog,
-    QSpinBox,
     QLabel,
     QPushButton,
-    QStatusBar,
-    QSplitter,
-    QScrollArea,
+    QLineEdit,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
-    QLineEdit,
+    QColorDialog,
+    QFileDialog,
+    QSplitter,
     QApplication
 )
+from PyQt5.QtCore import Qt
 
-from PyQt5.QtCore import (
-    Qt,
-    QSize,
-    QPoint,
-    QRect
-)
-
-from PyQt5.QtGui import (
-    QKeySequence
-)
+# Make all imports available at module level
+__all__ = [
+    'QMainWindow',
+    'QWidget',
+    'QVBoxLayout',
+    'QHBoxLayout',
+    'QLabel',
+    'QPushButton',
+    'QLineEdit',
+    'QTableWidget',
+    'QTableWidgetItem',
+    'QTextEdit',
+    'QColorDialog',
+    'QFileDialog',
+    'QSplitter',
+    'QApplication',
+    'Qt'
+]

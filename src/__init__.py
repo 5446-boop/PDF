@@ -1,1 +1,1 @@
-"""PDF Highlighter Package"""
+"""PDF Highlighter package."""

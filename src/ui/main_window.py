@@ -1,34 +1,39 @@
 """
 PDF Highlighter 2.0 - Main Window
-Last Updated: 2025-02-23 00:47:55 UTC
+Last Updated: 2025-02-23 02:58:24 UTC
+Author: 5446-boop
 """
 
-from src.ui.qt_imports import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QLineEdit,
-    QTableWidget,
-    QTableWidgetItem,
-    QTextEdit,
-    QColorDialog,
-    QFileDialog,
-    QSplitter,
-    Qt
+import logging
+import traceback
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QPushButton, QLineEdit,
+    QTextEdit, QFileDialog, QSplitter,
+    QMessageBox, QTableWidgetItem
 )
+from PyQt5.QtCore import Qt
 
-class MainWindow(QMainWindow):
-    """Main application window."""
-    
+from .base_window import BaseWindow
+from .widgets.color_picker import ColorPicker
+from .widgets.results_table import ResultsTable
+from src.utils.pdf_handler import PDFHandler, PDFError
+
+logger = logging.getLogger(__name__)
+
+class MainWindow(BaseWindow):
     def __init__(self):
         super().__init__()
-        self.current_pdf_path = None
-        self.current_color = (1, 1, 0)  # Default yellow
-        self.setup_ui()
-        
+        try:
+            self.pdf_handler = PDFHandler()
+            self.setup_ui()
+            self.log_message("Application started")
+        except Exception as e:
+            error_msg = f"Error initializing MainWindow: {str(e)}\n\n{traceback.format_exc()}"
+            logger.error(error_msg)
+            print("\nERROR:", error_msg)
+            raise
+
     def setup_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle("PDF Highlighter")
@@ -39,92 +44,66 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
         
-        # Create top splitter for areas 1 and 2
-        top_splitter = QSplitter(Qt.Horizontal)
+        # Create splitter for main layout
+        splitter = QSplitter(Qt.Horizontal)
         
-        # Area 1 - Control Panel (Top Left)
-        self.create_control_panel(top_splitter)
+        # Create left panel (controls)
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
         
-        # Area 2 - Results Table (Top Right)
-        self.create_results_table(top_splitter)
-        
-        # Set initial sizes for the splitter (50-50 split)
-        top_splitter.setSizes([400, 400])
-        
-        # Add top splitter to main layout
-        main_layout.addWidget(top_splitter)
-        
-        # Area 3 - Log Output (Bottom)
-        self.create_log_panel(main_layout)
-        
-        # Set layout proportions (70% top, 30% bottom)
-        main_layout.setStretch(0, 70)
-        main_layout.setStretch(1, 30)
-        
-    def create_control_panel(self, parent):
-        """Create the control panel (Area 1)."""
-        control_widget = QWidget()
-        layout = QVBoxLayout(control_widget)
-        
-        # PDF File Selection
-        file_layout = QHBoxLayout()
-        select_btn = QPushButton("Select PDF")
-        select_btn.clicked.connect(self.select_pdf)
-        file_layout.addWidget(select_btn)
+        # File selection
+        file_group = QWidget()
+        file_layout = QHBoxLayout(file_group)
+        self.select_btn = QPushButton("Select PDF")
+        self.select_btn.clicked.connect(self.select_pdf)
+        file_layout.addWidget(self.select_btn)
         
         self.path_label = QLabel("No file selected")
         self.path_label.setWordWrap(True)
         file_layout.addWidget(self.path_label)
-        layout.addLayout(file_layout)
+        left_layout.addWidget(file_group)
         
-        # Search Box
-        search_layout = QHBoxLayout()
+        # Search
+        search_group = QWidget()
+        search_layout = QHBoxLayout(search_group)
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Enter search text...")
         search_layout.addWidget(self.search_input)
         
-        search_btn = QPushButton("Search")
-        search_btn.clicked.connect(self.search_text)
-        search_layout.addWidget(search_btn)
-        layout.addLayout(search_layout)
+        self.search_btn = QPushButton("Search")
+        self.search_btn.clicked.connect(self.search_text)
+        search_layout.addWidget(self.search_btn)
+        left_layout.addWidget(search_group)
         
-        # Color Selection
-        color_layout = QHBoxLayout()
-        color_btn = QPushButton("Select Color")
-        color_btn.clicked.connect(self.select_color)
-        color_layout.addWidget(color_btn)
+        # Color picker
+        self.color_picker = ColorPicker()
+        left_layout.addWidget(self.color_picker)
         
-        self.color_preview = QLabel()
-        self.color_preview.setFixedSize(24, 24)
-        self.update_color_preview()
-        color_layout.addWidget(self.color_preview)
-        layout.addLayout(color_layout)
+        # Save button
+        self.save_btn = QPushButton("Save PDF")
+        self.save_btn.clicked.connect(self.save_pdf)
+        left_layout.addWidget(self.save_btn)
         
-        # Add stretch to push everything to the top
-        layout.addStretch()
+        left_layout.addStretch()
         
-        parent.addWidget(control_widget)
-        
-    def create_results_table(self, parent):
-        """Create the results table (Area 2)."""
-        self.results_table = QTableWidget()
-        self.results_table.setColumnCount(3)
-        self.results_table.setHorizontalHeaderLabels(["Page", "Text", "Color"])
-        self.results_table.itemDoubleClicked.connect(self.highlight_selected_text)
-        
-        # Set column widths
-        self.results_table.setColumnWidth(0, 80)   # Page number
-        self.results_table.setColumnWidth(1, 300)  # Text
-        self.results_table.setColumnWidth(2, 100)  # Color
-        
-        parent.addWidget(self.results_table)
-        
-    def create_log_panel(self, layout):
-        """Create the log output panel (Area 3)."""
+        # Create right panel (log)
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        layout.addWidget(self.log_output)
         
+        # Add panels to splitter
+        splitter.addWidget(left_panel)
+        splitter.addWidget(self.log_output)
+        
+        # Set splitter sizes (40% left, 60% right)
+        splitter.setSizes([400, 600])
+        
+        # Add splitter to main layout
+        main_layout.addWidget(splitter)
+        
+        # Create results table
+        self.results_table = ResultsTable()
+        main_layout.addWidget(self.results_table)
+
     def select_pdf(self):
         """Handle PDF file selection."""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -135,45 +114,154 @@ class MainWindow(QMainWindow):
         )
         
         if file_path:
-            self.current_pdf_path = file_path
-            self.path_label.setText(str(file_path))
-            self.log_message(f"Selected PDF: {file_path}")
-            
-    def select_color(self):
-        """Handle highlight color selection."""
-        color = QColorDialog.getColor()
-        if color.isValid():
-            self.current_color = (
-                color.red() / 255.0,
-                color.green() / 255.0,
-                color.blue() / 255.0
-            )
-            self.update_color_preview()
-            self.log_message(f"Selected color: RGB{self.current_color}")
-            
-    def update_color_preview(self):
-        """Update the color preview label."""
-        r, g, b = self.current_color
-        style = f"background-color: rgb({int(r*255)}, {int(g*255)}, {int(b*255)}); border: 1px solid black;"
-        self.color_preview.setStyleSheet(style)
-        
+            try:
+                if self.pdf_handler.load_document(file_path):
+                    self.path_label.setText(file_path)
+                    self.log_message(f"Loaded PDF: {file_path}")
+                    self.results_table.setRowCount(0)
+            except PDFError as e:
+                self.show_error("PDF Error", str(e))
+                self.log_message(f"Error loading PDF: {e}")
+            except Exception as e:
+                self.show_error("Error", f"Unexpected error: {str(e)}")
+                self.log_message(f"Unexpected error: {e}")
+
     def search_text(self):
         """Handle text search."""
-        text = self.search_input.text()
-        if not text or not self.current_pdf_path:
+        text = self.search_input.text().strip()
+        if not text:
+            self.show_error("Search Error", "Please enter search text")
             return
             
         self.log_message(f"Searching for: {text}")
-        # TODO: Implement actual PDF search
+        try:
+            results = self.pdf_handler.search_text(text)
+            self.results_table.setRowCount(0)
+            
+            for result in results:
+                row = self.results_table.rowCount()
+                self.results_table.insertRow(row)
+                self.add_result_to_table(row, result)
+                
+            if not results:
+                self.show_error("Search Results", f"No matches found for '{text}'")
+                
+        except Exception as e:
+            self.show_error("Search Error", str(e))
+            logger.error(f"Search error: {traceback.format_exc()}")
+
+    def add_result_to_table(self, row, result):
+        """Add a search result to the table."""
+        try:
+            # Page number
+            page_item = QTableWidgetItem(f"{result.page_num} ({len(result.rects)})")
+            page_item.setData(Qt.UserRole, result.rects)
+            page_item.setFlags(page_item.flags() & ~Qt.ItemIsEditable)
+            self.results_table.setItem(row, 0, page_item)
+            
+            # Color status
+            color_item = QTableWidgetItem()
+            color_item.setFlags(Qt.ItemIsEnabled)
+            self.results_table.update_highlight_status(
+                color_item,
+                result.highlight_color is not None,
+                result.highlight_color
+            )
+            if result.annot_xrefs:
+                color_item.setData(Qt.UserRole, result.annot_xrefs)
+            self.results_table.setItem(row, 1, color_item)
+            
+            # Buttons
+            highlight_btn = self.results_table.create_action_button("Highlight All")
+            highlight_btn.clicked.connect(lambda: self.add_highlight(row, result.text))
+            self.results_table.setCellWidget(row, 2, highlight_btn)
+            
+            remove_btn = self.results_table.create_action_button("Remove All")
+            remove_btn.clicked.connect(lambda: self.remove_highlight(row))
+            self.results_table.setCellWidget(row, 3, remove_btn)
+            
+        except Exception as e:
+            self.log_message(f"Error adding result to table: {e}")
+            logger.error(f"Error adding result to table: {traceback.format_exc()}")
+
+    def add_highlight(self, row, text):
+        """Add highlights to all instances of text on the specified page."""
+        try:
+            page_item = self.results_table.item(row, 0)
+            color_item = self.results_table.item(row, 1)
+            
+            if not page_item or not color_item:
+                return
+                
+            page_num = int(page_item.text().split()[0])
+            rects = page_item.data(Qt.UserRole)
+            
+            if not color_item.data(Qt.UserRole + 1):
+                xrefs = self.pdf_handler.highlight_text(page_num, rects, self.color_picker.get_color(), text)
+                if xrefs:
+                    self.results_table.update_highlight_status(color_item, True, self.color_picker.get_color())
+                    color_item.setData(Qt.UserRole, xrefs)
+                    self.log_message(f"Added {len(rects)} highlights on page {page_num}")
+                    
+        except Exception as e:
+            self.log_message(f"Error adding highlights: {e}")
+            logger.error(f"Error adding highlights: {traceback.format_exc()}")
+
+    def remove_highlight(self, row):
+        """Remove all highlights from the specified page."""
+        try:
+            page_item = self.results_table.item(row, 0)
+            color_item = self.results_table.item(row, 1)
+            
+            if not page_item or not color_item:
+                return
+                
+            page_num = int(page_item.text().split()[0])
+            xrefs = color_item.data(Qt.UserRole)
+            
+            if xrefs and color_item.data(Qt.UserRole + 1):
+                if self.pdf_handler.remove_highlight(page_num, xrefs):
+                    self.results_table.update_highlight_status(color_item, False)
+                    color_item.setData(Qt.UserRole, None)
+                    self.log_message(f"Removed all highlights on page {page_num}")
+                    
+        except Exception as e:
+            self.log_message(f"Error removing highlights: {e}")
+            logger.error(f"Error removing highlights: {traceback.format_exc()}")
+
+    def save_pdf(self):
+        """Save PDF with highlights."""
+        if not self.pdf_handler.filepath:
+            self.show_error("Save Error", "No PDF file loaded")
+            return
         
-    def highlight_selected_text(self, item):
-        """Handle double-click on results table."""
-        row = item.row()
-        page = self.results_table.item(row, 0).text()
-        text = self.results_table.item(row, 1).text()
-        self.log_message(f"Highlighting text on page {page}: {text}")
-        # TODO: Implement actual highlighting
+        reply = QMessageBox.question(
+            self,
+            'Save PDF',
+            'Do you want to overwrite the existing file?',
+            QMessageBox.Yes | QMessageBox.Cancel,
+            QMessageBox.Cancel
+        )
         
-    def log_message(self, message: str):
-        """Add message to log output."""
-        self.log_output.append(message)
+        if reply == QMessageBox.Yes:
+            try:
+                # Reload the document before saving to ensure all changes are captured
+                if self.pdf_handler.reload_document():
+                    if self.pdf_handler.save_document(self.pdf_handler.filepath):
+                        self.log_message(f"Saved PDF with highlights to: {self.pdf_handler.filepath}")
+                    else:
+                        raise PDFError("Failed to save PDF")
+                else:
+                    raise PDFError("Failed to reload PDF before saving")
+            except Exception as e:
+                self.show_error("Save Error", str(e))
+                self.log_message(f"Error saving PDF: {e}")
+
+    def closeEvent(self, event):
+        """Handle window close event."""
+        try:
+            if self.pdf_handler:
+                self.pdf_handler.close()
+        except:
+            pass
+        super().closeEvent(event)

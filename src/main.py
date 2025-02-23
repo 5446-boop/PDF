@@ -1,18 +1,10 @@
 """
 PDF Highlighter 2.0 - Main Module
-Last Updated: 2025-02-23 00:45:20 UTC
+Last Updated: 2025-02-23 01:00:37 UTC
+Author: 5446-boop
 """
 
-import sys
-from src.ui.qt_imports import QApplication
-from src.ui.main_window import MainWindow
+from .ui.main_window import MainWindow
 
-def main():
-    """Main application entry point."""
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    return app.exec_()
-
-if __name__ == "__main__":
-    sys.exit(main())
+# Export MainWindow for the entry point
+__all__ = ['MainWindow']
