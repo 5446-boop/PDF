@@ -188,36 +188,42 @@ class PDFHandler:
             logger.error(f"Error adding highlights: {e}")
             return None
 
-    def remove_highlight(self, page_num: int, xrefs: List[int]) -> bool:
-        """Remove highlights from the specified page."""
-        if not self.doc or not xrefs:
+    def remove_highlight(self, page_num: int, xrefs: List[int] = None) -> bool:
+        """Remove all highlights from the specified page."""
+        if not self.doc:
             return False
 
         try:
             page = self.doc[page_num - 1]
             success = False
 
-            # First verify which annotations actually exist
-            valid_xrefs = []
+            # Get all highlights on the page if no specific xrefs provided
+            highlights_to_remove = []
             for annot in page.annots():
-                if annot.xref in xrefs:
-                    valid_xrefs.append(annot.xref)
+                if annot.type[0] == 8:  # Highlight annotation type
+                    highlights_to_remove.append(annot.xref)
 
-            for xref in valid_xrefs:
+            if not highlights_to_remove:
+                logger.debug(f"No highlights found on page {page_num}")
+                return False
+
+            # Remove all highlights
+            for xref in highlights_to_remove:
                 try:
                     annot = page.load_annot(xref)
-                    if annot and annot.type[0] == 8:  # Verify it's a highlight annotation
+                    if annot:
                         page.delete_annot(annot)
                         success = True
                 except Exception as e:
-                    logger.error(f"Error loading annotation {xref}: {e}")
+                    logger.error(f"Error removing highlight {xref}: {e}")
                     continue
 
             if success:
-                # Use save_and_reload instead of just save
+                # Save and reload after removing all highlights
                 if not self.save_and_reload():
                     logger.error("Failed to save and reload document after removing highlights")
                     return False
+                logger.info(f"Successfully removed {len(highlights_to_remove)} highlights from page {page_num}")
                 return True
 
             return success
