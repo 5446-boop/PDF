@@ -1,16 +1,9 @@
 # PDF Highlighter 2.0
 
-A powerful PyQt5-based PDF viewer and highlighter application that allows searching, highlighting, and managing text in PDF documents with an intuitive interface.
+A PyQt5-based PDF-highlighter application that allows highlighting text in a PDF document.
 
 ## Features
-- 📄 Load and view PDF files seamlessly
-- 🔍 Advanced text search capabilities
-- 🎨 Customizable highlight colors
-- ⚡ Quick highlight removal with double-click
-- 💾 Save PDFs with highlights preserved
-- 📊 Detailed logging and debug options
-- 🎯 Results table with page numbers and counts
-- ⌨️ Keyboard shortcuts for common actions
+
 
 ## Installation
 
