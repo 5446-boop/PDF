@@ -39,20 +39,20 @@ class SearchHandler:
         except Exception as e:
             self.main_window.show_error("Search Error", str(e))
             logger.error(f"Search error: {traceback.format_exc()}")
+            self.main_window.show_error("Search Error", str(e))
+            logger.error(f"Search error: {traceback.format_exc()}")
 
-    def add_result_to_table(self, row, result):
-        """Add a search result to the table."""
     def add_result_to_table(self, row, result):
         """Add a search result to the table."""
         try:
             # Page number
             page_item = QTableWidgetItem(f"{result.page_num:03}/{len(self.main_window.pdf_handler.doc)}")
-            page_item.setData(Qt.UserRole, result.bbox)
+            page_item.setData(Qt.UserRole, result.bboxes)
             page_item.setFlags(page_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 0, page_item)
             
             # Total matches
-            found_item = QTableWidgetItem(str(len(result.bbox)))
+            found_item = QTableWidgetItem(str(len(result.bboxes)))
             found_item.setFlags(found_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 1, found_item)
             
@@ -63,7 +63,7 @@ class SearchHandler:
             
             # Invoice number
             fak_no_item = QTableWidgetItem(result.invoice_number or "N/A")
-            fak_no_item.setFlags(dev_no_item.flags() & ~Qt.ItemIsEditable)
+            fak_no_item.setFlags(fak_no_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 3, fak_no_item)
             
             # Highlight color
@@ -92,7 +92,7 @@ class SearchHandler:
             )
             self.main_window.results_table.setCellWidget(row, 6, remove_btn)
             
-            logger.debug(f"Added result for page {result.page_num} with {len(result.bbox)} matches")
+            logger.debug(f"Added result for page {result.page_num} with {len(result.bboxes)} matches")
             
         except Exception as e:
             logger.error(f"Error adding result to table: {traceback.format_exc()}")
