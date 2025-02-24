@@ -273,68 +273,63 @@ class PDFHandler:
             logger.error(f"Error reloading document: {e}")
             return False
 
-    def search_text(self, query: str) -> List[SearchResult]:
-        """Search for text in the document."""
-        if not self.doc:
-            logger.error("No PDF document loaded")
-            raise PDFError("No PDF document loaded")
-        if not query:
-            logger.debug("Empty search query, returning empty results")
-            return []
+def search_text(self, query: str) -> List[SearchResult]:
+    """Search for text in the document."""
+    if not self.doc:
+        logger.error("No PDF document loaded")
+        raise PDFError("No PDF document loaded")
+    if not query:
+        logger.debug("Empty search query, returning empty results")
+        return []
 
-        page_results = {}
-        try:
-            logger.debug(f"Starting search for query: '{query}'")
-            for page_num in range(len(self.doc)):
-                try:
-                    page = self.doc[page_num]
-                    matches = page.search_for(query)
+    page_results = []
+    delivery_pattern = re.compile(r"Delivery Number:\s*(\d+)")
+    invoice_pattern = re.compile(r"Invoice Number:\s*(\d+)")
+    
+    try:
+        logger.debug(f"Starting search for query: '{query}'")
+        for page_num in range(len(self.doc)):
+            try:
+                page = self.doc[page_num]
+                matches = page.search_for(query)
 
-                    if matches:
-                        logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
-                        rects = []
-                        xrefs = []
-                        highlight_color = None
+                if matches:
+                    # Get all text from the page for number extraction
+                    page_text = page.get_text("text")
+                    
+                    # Find delivery and invoice numbers
+                    delivery_match = delivery_pattern.search(page_text)
+                    invoice_match = invoice_pattern.search(page_text)
+                    
+                    delivery_number = delivery_match.group(1) if delivery_match else None
+                    invoice_number = invoice_match.group(1) if invoice_match else None
+                    
+                    # Create search result
+                    result = SearchResult(
+                        page_num=page_num + 1,
+                        text=query,
+                        bboxes=[tuple(rect) for rect in matches],
+                        total_matches=len(matches),
+                        highlight_color=None,  # Will be set when highlighted
+                        annot_xrefs=None,     # Will be set when highlighted
+                        delivery_number=delivery_number,
+                        invoice_number=invoice_number
+                    )
+                    
+                    page_results.append(result)
+                    logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
 
-                        for rect in matches:
-                            rects.append(tuple(rect))
-                            highlight_info = self.check_existing_highlight(page_num + 1, tuple(rect), query)
-                            if highlight_info:
-                                color, xref = highlight_info
-                                highlight_color = color
-                                xrefs.append(xref)
+            except Exception as e:
+                logger.warning(f"Error processing page {page_num + 1}: {e}")
+                continue
 
-                        expanded_rect = fitz.Rect(matches[0])
-                        expanded_rect.x0 = max(0, expanded_rect.x0 - 20)
-                        expanded_rect.x1 = min(page.rect.width, expanded_rect.x1 + 20)
-                        expanded_rect.y0 = max(0, expanded_rect.y0 - 10)
-                        expanded_rect.y1 = min(page.rect.height, expanded_rect.y1 + 10)
-                        context = page.get_text("text", clip=expanded_rect).strip()
-                        logger.debug(f"Got context for page {page_num + 1}: '{context[:50]}...'")
+        logger.info(f"Search complete - found results on {len(page_results)} pages")
+        return page_results
 
-                        result = SearchResult(
-                            page_num=page_num + 1,
-                            text=query,
-                            rects=rects,
-                            context=context,
-                            highlight_color=highlight_color,
-                            annot_xrefs=xrefs if xrefs else None
-                        )
-                        page_results[page_num + 1] = result
-                        logger.debug(f"Added result for page {page_num + 1}")
-
-                except Exception as e:
-                    logger.warning(f"Error processing page {page_num + 1}: {e}")
-                    continue
-
-            results = list(page_results.values())
-            logger.debug(f"Search complete - found matches on {len(results)} pages")
-            return results
-
-        except Exception as e:
-            error_msg = f"Error during search: {str(e)}\n{traceback.format_exc()}"
-            logger.error(error_msg)
-            raise PDFError(f"Search failed: {str(e)}")
+    except Exception as e:
+        error_msg = f"Error during search: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        raise PDFError(f"Search failed: {str(e)}")
 
     def list_annotations(self, page_num: int):
         """List all annotations on a specific page."""

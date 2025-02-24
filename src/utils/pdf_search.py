@@ -1,11 +1,11 @@
 """
 PDF Highlighter 2.0 - PDF Search Engine
-Last Updated: 2025-02-22 22:21:40 UTC
+Last Updated: 2025-02-24 17:55:36 UTC
 """
 
 import logging
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
 try:
@@ -21,9 +21,16 @@ class SearchResult:
     """Data class for search results."""
     page_num: int
     text: str
-    bbox: Tuple[float, float, float, float]  # x0, y0, x1, y1
+    bboxes: List[Tuple[float, float, float, float]]  # List of rectangles where text is found
+    total_matches: int  # Total number of matches on the page
     highlight_color: Optional[Tuple[float, float, float]] = None  # RGB values
-    annot_xref: Optional[int] = None  # Reference to the PDF annotation
+    annot_xrefs: Optional[List[int]] = None  # List of references to the PDF annotations
+    delivery_number: Optional[str] = None  # Delivery number if found
+    invoice_number: Optional[str] = None  # Invoice number if found
+
+    def format_page_number(self, total_pages: int) -> str:
+        """Format page number as XXX/YYY."""
+        return f"{self.page_num:03d}/{total_pages:03d}"
 
 class PDFSearchEngine:
     """PDF search and highlight engine."""

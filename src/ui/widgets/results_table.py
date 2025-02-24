@@ -1,53 +1,66 @@
 """
 PDF Highlighter 2.0 - Results Table Widget
-Last Updated: 2025-02-23 10:38:17 UTC
-Author: 5446-boop
+Last Updated: 2025-02-24 17:55:36 UTC
 """
 
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QPushButton, QHeaderView
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor, QBrush
+from PyQt5.QtGui import QColor
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ResultsTable(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setup_ui()
+        self.setup_table()
 
-    def setup_ui(self):
-        """Initialize the table UI."""
-        self.setColumnCount(5)  # Changed from 4 to 5
-        self.setHorizontalHeaderLabels(["Page", "Found", "Color", "Highlight All", "Remove All"])
+    def setup_table(self):
+        """Initialize the table with the required columns."""
+        # Define columns
+        columns = [
+            "Page",          # Format: "001/100"
+            "Matches",       # Total matches on page
+            "Dev. No.",     # Delivery Number
+            "Fak. No.",     # Invoice Number
+            "Color",        # Highlight color
+            "",            # Highlight button column
+            ""             # Remove button column
+        ]
         
-        # Set column widths
-        self.setColumnWidth(0, 80)   # Page
-        self.setColumnWidth(1, 80)   # Found
-        self.setColumnWidth(2, 100)  # Color
-        self.setColumnWidth(3, 100)  # Highlight All
-        self.setColumnWidth(4, 100)  # Remove All
+        self.setColumnCount(len(columns))
+        self.setHorizontalHeaderLabels(columns)
         
+        # Set column properties
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Page
+        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Matches
+        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)          # Dev. No.
+        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)          # Fak. No.
+        self.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Color
+        self.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Highlight
+        self.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Remove
+        
+        # Enable sorting
         self.setSortingEnabled(True)
+        
+        # Set selection behavior
+        self.setSelectionBehavior(QTableWidget.SelectRows)
+        self.setSelectionMode(QTableWidget.SingleSelection)
 
-    def create_action_button(self, text):
-        """Create a button for the table."""
+    def create_action_button(self, text: str) -> QPushButton:
+        """Create a button for the action columns."""
         button = QPushButton(text)
-        button.setFixedWidth(90)
+        button.setFixedWidth(80)
         return button
 
-    def update_highlight_status(self, item, is_highlighted, color=None):
-        """Update the color cell with color visualization."""
+    def update_highlight_status(self, item: QTableWidgetItem, is_highlighted: bool, color: tuple = None):
+        """Update the highlight status cell."""
         if is_highlighted and color:
-            hex_color = self.rgb_to_hex(color)
-            item.setBackground(QBrush(QColor(hex_color)))
-            item.setText("")
-            item.setData(Qt.UserRole + 1, color)
+            item.setBackground(QColor.fromRgbF(*color))
+            item.setText("✓")
         else:
-            item.setBackground(QBrush())
+            item.setBackground(QColor(255, 255, 255))
             item.setText("")
-            item.setData(Qt.UserRole + 1, None)
-        item.setFlags(Qt.ItemIsEnabled)
-
-    @staticmethod
-    def rgb_to_hex(rgb_tuple):
-        """Convert RGB tuple (0-1 range) to hex color string."""
-        r, g, b = rgb_tuple
-        return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+        
+        item.setData(Qt.UserRole + 1, is_highlighted)
+        item.setTextAlignment(Qt.AlignCenter)
