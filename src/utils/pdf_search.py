@@ -5,7 +5,7 @@ Last Updated: 2025-02-22 22:21:40 UTC
 
 import logging
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Optional
 from dataclasses import dataclass
 
 try:
@@ -24,6 +24,8 @@ class SearchResult:
     bbox: Tuple[float, float, float, float]  # x0, y0, x1, y1
     highlight_color: Optional[Tuple[float, float, float]] = None  # RGB values
     annot_xref: Optional[int] = None  # Reference to the PDF annotation
+    delivery_number: Optional[str] = None  # Delivery number if found
+    invoice_number: Optional[str] = None  # Invoice number if found
 
 class PDFSearchEngine:
     """PDF search and highlight engine."""

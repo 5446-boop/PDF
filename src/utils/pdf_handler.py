@@ -6,10 +6,12 @@ Author: 5446-boop
 
 import logging
 import traceback
+import re
 import os
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 from pathlib import Path
+from .pdf_search import SearchResult
 import fitz  # PyMuPDF
 
 # Get module-level logger
@@ -283,6 +285,9 @@ class PDFHandler:
             return []
 
         page_results = {}
+        delivery_pattern = re.compile(r"Delivery Number: (\d+)")
+        invoice_pattern = re.compile(r"Invoice Number: (\d+)")
+        
         try:
             logger.debug(f"Starting search for query: '{query}'")
             for page_num in range(len(self.doc)):
@@ -295,6 +300,8 @@ class PDFHandler:
                         rects = []
                         xrefs = []
                         highlight_color = None
+                        delivery_number = None
+                        invoice_number = None
 
                         for rect in matches:
                             rects.append(tuple(rect))
@@ -311,14 +318,23 @@ class PDFHandler:
                         expanded_rect.y1 = min(page.rect.height, expanded_rect.y1 + 10)
                         context = page.get_text("text", clip=expanded_rect).strip()
                         logger.debug(f"Got context for page {page_num + 1}: '{context[:50]}...'")
+                        
+                        delivery_match = delivery_pattern.search(context)
+                        if delivery_match:
+                            delivery_number = delivery_match.group(1)
+                            
+                        invoice_match = invoice_pattern.search(context)
+                        if invoice_match:
+                            invoice_number = invoice_match.group(1)
 
                         result = SearchResult(
                             page_num=page_num + 1,
                             text=query,
-                            rects=rects,
-                            context=context,
+                            bbox=rects[0],  # Assuming bbox corresponds to the first match
                             highlight_color=highlight_color,
-                            annot_xrefs=xrefs if xrefs else None
+                            annot_xref=xrefs[0] if xrefs else None,
+                            delivery_number=delivery_number,
+                            invoice_number=invoice_number
                         )
                         page_results[page_num + 1] = result
                         logger.debug(f"Added result for page {page_num + 1}")
