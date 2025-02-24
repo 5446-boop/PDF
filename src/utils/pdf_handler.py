@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - PDF Handler
-Last Updated: 2025-02-24 18:09:18 UTC
+Last Updated: 2025-02-24 18:27:19 UTC
 Author: 5446-boop
 """
 
@@ -39,7 +39,143 @@ class PDFHandler:
     def __init__(self):
         self.doc = None
         self.filepath = None
+        # Compile regex patterns once at initialization for better performance
+        self._compile_search_patterns()
         logger.debug("PDFHandler initialized")
+    
+    def _compile_search_patterns(self):
+        """Compile regex patterns for invoice and delivery numbers."""
+        # More comprehensive patterns for invoice number detection
+        invoice_patterns = [
+            r"Invoice[:\s]*(?:No\.?|Number:?|#)?\s*(\d{5,12})",  # Basic format
+            r"Rechnung(?:s-?(?:nr\.?|nummer:?))?\s*(\d{5,12})",  # German format
+            r"Fak(?:tura)?\.?\s*(?:nr\.?|number:?)?\s*(\d{5,12})",  # Alternative format
+            r"(?:Bill|Invoice)\s*(?:#|No\.?|Number:?)?\s*[:\s]?\s*(\d{5,12})",  # Extended format
+            r"(?<!\d)(\d{10})(?!\d)",  # Standalone 10-digit number
+            r"F\d{2}-(\d{5,12})",  # F-prefixed format
+            r"R\d{2}-(\d{5,12})"   # R-prefixed format
+        ]
+        
+        # Combine patterns into a single regex with named groups
+        self.invoice_pattern = re.compile(
+            '|'.join(f'(?P<inv{i}>{pattern})' for i, pattern in enumerate(invoice_patterns)),
+            re.IGNORECASE | re.MULTILINE
+        )
+        
+        self.delivery_pattern = re.compile(
+            r"Delivery(?:[-\s])?(?:No\.?|Number:?|#)?\s*(\d{5,12})",
+            re.IGNORECASE | re.MULTILINE
+        )
+        logger.debug("Search patterns compiled")
+
+    def search_text(self, query: str) -> List[SearchResult]:
+        """Search for text in the document."""
+        if not self.doc or not query:
+            return []
+
+        page_results = []
+        try:
+            logger.debug(f"Starting search for query: '{query}'")
+            for page_num in range(len(self.doc)):
+                try:
+                    page = self.doc[page_num]
+                    matches = page.search_for(query)
+
+                    if matches:
+                        # Get text in different formats for better extraction
+                        page_text = page.get_text("text")  # Standard text
+                        page_blocks = page.get_text("blocks")  # Text blocks with positioning
+                        page_dict = page.get_text("dict")  # Detailed text information
+                        
+                        # Find invoice number using multiple approaches
+                        invoice_number = self._extract_invoice_number(
+                            page_text, 
+                            page_blocks, 
+                            page_dict,
+                            matches[0]  # Use first match position as reference
+                        )
+                        
+                        # Find delivery number (keeping existing logic)
+                        delivery_match = self.delivery_pattern.search(page_text)
+                        
+                        result = SearchResult(
+                            page_num=page_num + 1,
+                            text=query,
+                            bboxes=[tuple(rect) for rect in matches],
+                            total_matches=len(matches),
+                            highlight_color=None,
+                            annot_xrefs=None,
+                            delivery_number=delivery_match.group(1) if delivery_match else None,
+                            invoice_number=invoice_number
+                        )
+                        
+                        page_results.append(result)
+                        logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
+                        if invoice_number:
+                            logger.debug(f"Found invoice number: {invoice_number}")
+
+                except Exception as e:
+                    logger.warning(f"Error processing page {page_num + 1}: {e}")
+                    continue
+
+            logger.info(f"Search complete - found results on {len(page_results)} pages")
+            return page_results
+
+        except Exception as e:
+            logger.error(f"Search error: {str(e)}")
+            return []
+
+    def _extract_invoice_number(self, text: str, blocks: list, text_dict: dict, match_pos: tuple) -> Optional[str]:
+        """
+        Extract invoice number using multiple approaches for better reliability.
+        
+        Args:
+            text: Raw text content of the page
+            blocks: Text blocks with positioning information
+            text_dict: Detailed text information dictionary
+            match_pos: Position of the search match (for proximity search)
+            
+        Returns:
+            Optional[str]: Extracted invoice number or None if not found
+        """
+        try:
+            # Method 1: Pattern matching on full text
+            for match in self.invoice_pattern.finditer(text):
+                # Get the first non-None group (the actual number)
+                groups = match.groups()
+                for group in groups:
+                    if group:
+                        return group
+
+            # Method 2: Search in nearby blocks
+            match_x, match_y = match_pos[0], match_pos[1]  # Use first match position
+            nearby_text = ""
+            
+            for block in blocks:
+                # Check if block is near the match position (within 200 points)
+                if isinstance(block, (tuple, list)) and len(block) >= 6:
+                    block_x, block_y = block[0], block[1]
+                    if abs(block_x - match_x) < 200 and abs(block_y - match_y) < 200:
+                        nearby_text += block[4] if len(block) > 4 else ""
+
+            # Search in nearby text
+            if nearby_text:
+                for match in self.invoice_pattern.finditer(nearby_text):
+                    groups = match.groups()
+                    for group in groups:
+                        if group:
+                            return group
+
+            # Method 3: Look for standalone numbers in the right format
+            number_pattern = re.compile(r'(?<!\d)(\d{10})(?!\d)')  # Standalone 10-digit number
+            for match in number_pattern.finditer(text):
+                return match.group(1)
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error extracting invoice number: {e}")
+            return None
 
     def load_document(self, filepath: str) -> bool:
         """Load a PDF document from the specified filepath."""
@@ -113,52 +249,6 @@ class PDFHandler:
             if original_doc:
                 self.doc = original_doc
             return False
-
-    def search_text(self, query: str) -> List[SearchResult]:
-        """Search for text in the document."""
-        if not self.doc or not query:
-            return []
-
-        page_results = []
-        delivery_pattern = re.compile(r"Delivery Number:\s*(\d+)")
-        invoice_pattern = re.compile(r"Invoice Number:\s*(\d+)")
-        
-        try:
-            logger.debug(f"Starting search for query: '{query}'")
-            for page_num in range(len(self.doc)):
-                try:
-                    page = self.doc[page_num]
-                    matches = page.search_for(query)
-
-                    if matches:
-                        page_text = page.get_text("text")
-                        delivery_match = delivery_pattern.search(page_text)
-                        invoice_match = invoice_pattern.search(page_text)
-                        
-                        result = SearchResult(
-                            page_num=page_num + 1,
-                            text=query,
-                            bboxes=[tuple(rect) for rect in matches],
-                            total_matches=len(matches),
-                            highlight_color=None,
-                            annot_xrefs=None,
-                            delivery_number=delivery_match.group(1) if delivery_match else None,
-                            invoice_number=invoice_match.group(1) if invoice_match else None
-                        )
-                        
-                        page_results.append(result)
-                        logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
-
-                except Exception as e:
-                    logger.warning(f"Error processing page {page_num + 1}: {e}")
-                    continue
-
-            logger.info(f"Search complete - found results on {len(page_results)} pages")
-            return page_results
-
-        except Exception as e:
-            logger.error(f"Search error: {str(e)}")
-            return []
 
     def highlight_text(self, page_num: int, rects: List[Tuple[float, float, float, float]], 
                       color: Tuple[float, float, float], query: str) -> Optional[List[int]]:
