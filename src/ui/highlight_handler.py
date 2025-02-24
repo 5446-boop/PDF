@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - Highlight Handler
-Last Updated: 2025-02-23 11:38:03 UTC
+Last Updated: 2025-02-24 18:15:01 UTC
 Author: 5446-boop
 """
 
@@ -20,19 +20,20 @@ class HighlightHandler:
         """Add highlights to all instances of text on the specified page."""
         try:
             page_item = self.main_window.results_table.item(row, 0)
-            color_item = self.main_window.results_table.item(row, 2)
+            color_item = self.main_window.results_table.item(row, 4)  # Changed from 2 to 4
             
             if not page_item or not color_item:
                 return
                 
-            page_num = int(page_item.text())
-            rects = page_item.data(Qt.UserRole)
+            # Parse page number from format "XXX/YYY"
+            page_num = int(page_item.text().split('/')[0])
+            bboxes = page_item.data(Qt.UserRole)
             
             if not color_item.data(Qt.UserRole + 1):
                 logger.debug(f"Adding highlights on page {page_num} for '{text}'")
                 xrefs = self.main_window.pdf_handler.highlight_text(
                     page_num, 
-                    rects, 
+                    bboxes, 
                     self.main_window.color_picker.get_color(), 
                     text
                 )
@@ -43,7 +44,7 @@ class HighlightHandler:
                         self.main_window.color_picker.get_color()
                     )
                     color_item.setData(Qt.UserRole, xrefs)
-                    logger.info(f"Added {len(rects)} highlights on page {page_num}")
+                    logger.info(f"Added {len(bboxes)} highlights on page {page_num}")
                     self.main_window.search_handler.refresh_search_results()
                     
         except Exception as e:
@@ -53,12 +54,13 @@ class HighlightHandler:
         """Remove all highlights from the specified page."""
         try:
             page_item = self.main_window.results_table.item(row, 0)
-            color_item = self.main_window.results_table.item(row, 2)
+            color_item = self.main_window.results_table.item(row, 4)  # Changed from 2 to 4
             
             if not page_item or not color_item:
                 return
                 
-            page_num = int(page_item.text())
+            # Parse page number from format "XXX/YYY"
+            page_num = int(page_item.text().split('/')[0])
             xrefs = color_item.data(Qt.UserRole)
             
             if xrefs and color_item.data(Qt.UserRole + 1):
@@ -90,7 +92,7 @@ class HighlightHandler:
             try:
                 logger.debug("Saving PDF with highlights")
                 if self.main_window.pdf_handler.reload_document():
-                    if self.main_window.pdf_handler.save_document(self.main_window.pdf_handler.filepath):
+                    if self.main_window.pdf_handler.save():  # Changed to use the simpler save() method
                         logger.info(f"Successfully saved PDF to: {self.main_window.pdf_handler.filepath}")
                     else:
                         raise PDFError("Failed to save PDF")

@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - PDF Handler
-Last Updated: 2025-02-24 18:07:04 UTC
+Last Updated: 2025-02-24 18:09:18 UTC
 Author: 5446-boop
 """
 
@@ -26,6 +26,10 @@ class SearchResult:
     annot_xrefs: Optional[List[int]] = None
     delivery_number: Optional[str] = None
     invoice_number: Optional[str] = None
+
+    def format_page_number(self, total_pages: int) -> str:
+        """Format page number as XXX/YYY."""
+        return f"{self.page_num:03d}/{total_pages:03d}"
 
 class PDFError(Exception):
     """Custom exception for PDF operations."""
