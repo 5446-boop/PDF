@@ -21,7 +21,7 @@ class SearchResult:
     """Data class for search results."""
     page_num: int
     text: str
-    bboxes: List[Tuple[float, float, float, float]]  # List of rectangles where text is found
+    rects: List[Tuple[float, float, float, float]]  # List of rectangles where text is found
     highlight_color: Optional[Tuple[float, float, float]] = None  # RGB values
     annot_xrefs: Optional[List[int]] = None  # List of references to the PDF annotations
     delivery_number: Optional[str] = None  # Delivery number if found

@@ -1,11 +1,4 @@
-"""
-PDF Highlighter 2.0 - Search Handler
-Last Updated: 2025-02-23 11:38:03 UTC
-Author: 5446-boop
-"""
-
 import logging
-import traceback
 from PyQt5.QtWidgets import QTableWidgetItem
 from PyQt5.QtCore import Qt
 
@@ -39,20 +32,18 @@ class SearchHandler:
         except Exception as e:
             self.main_window.show_error("Search Error", str(e))
             logger.error(f"Search error: {traceback.format_exc()}")
-            self.main_window.show_error("Search Error", str(e))
-            logger.error(f"Search error: {traceback.format_exc()}")
 
     def add_result_to_table(self, row, result):
         """Add a search result to the table."""
         try:
             # Page number
             page_item = QTableWidgetItem(f"{result.page_num:03}/{len(self.main_window.pdf_handler.doc)}")
-            page_item.setData(Qt.UserRole, result.bboxes)
+            page_item.setData(Qt.UserRole, result.rects)
             page_item.setFlags(page_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 0, page_item)
             
             # Total matches
-            found_item = QTableWidgetItem(str(len(result.bboxes)))
+            found_item = QTableWidgetItem(str(len(result.rects)))
             found_item.setFlags(found_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 1, found_item)
             
@@ -92,7 +83,7 @@ class SearchHandler:
             )
             self.main_window.results_table.setCellWidget(row, 6, remove_btn)
             
-            logger.debug(f"Added result for page {result.page_num} with {len(result.bboxes)} matches")
+            logger.debug(f"Added result for page {result.page_num} with {len(result.rects)} matches")
             
         except Exception as e:
             logger.error(f"Error adding result to table: {traceback.format_exc()}")

@@ -34,6 +34,7 @@ class PDFHandler:
     def __init__(self, doc):
         self.doc = doc
         self.highlights = {}
+
     def search_text(self, query: str) -> List[SearchResult]:
         """Search for text in the document."""
         if not self.doc:
@@ -56,14 +57,14 @@ class PDFHandler:
 
                     if matches:
                         logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
-                        bboxes = []
+                        rects = []
                         xrefs = []
                         highlight_color = None
                         delivery_number = None
                         invoice_number = None
 
                         for rect in matches:
-                            bboxes.append(tuple(rect))
+                            rects.append(tuple(rect))
                             highlight_info = self.check_existing_highlight(page_num + 1, tuple(rect), query)
                             if highlight_info:
                                 color, xref = highlight_info
@@ -89,7 +90,7 @@ class PDFHandler:
                         result = SearchResult(
                             page_num=page_num + 1,
                             text=query,
-                            bboxes=bboxes,
+                            rects=rects,
                             highlight_color=highlight_color,
                             annot_xrefs=xrefs if xrefs else None,
                             delivery_number=delivery_number,
