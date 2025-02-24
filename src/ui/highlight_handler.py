@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - Highlight Handler
-Last Updated: 2025-02-24 18:15:01 UTC
+Last Updated: 2025-02-24 18:22:24 UTC
 Author: 5446-boop
 """
 
@@ -20,16 +20,16 @@ class HighlightHandler:
         """Add highlights to all instances of text on the specified page."""
         try:
             page_item = self.main_window.results_table.item(row, 0)
-            color_item = self.main_window.results_table.item(row, 4)  # Changed from 2 to 4
+            color_item = self.main_window.results_table.item(row, 4)
             
             if not page_item or not color_item:
+                logger.warning(f"Missing items - page_item: {bool(page_item)}, color_item: {bool(color_item)}")
                 return
                 
-            # Parse page number from format "XXX/YYY"
             page_num = int(page_item.text().split('/')[0])
             bboxes = page_item.data(Qt.UserRole)
             
-            if not color_item.data(Qt.UserRole + 1):
+            if not color_item.data(Qt.UserRole + 1):  # If not already highlighted
                 logger.debug(f"Adding highlights on page {page_num} for '{text}'")
                 xrefs = self.main_window.pdf_handler.highlight_text(
                     page_num, 
@@ -43,8 +43,6 @@ class HighlightHandler:
                         True, 
                         self.main_window.color_picker.get_color()
                     )
-                    color_item.setData(Qt.UserRole, xrefs)
-                    logger.info(f"Added {len(bboxes)} highlights on page {page_num}")
                     self.main_window.search_handler.refresh_search_results()
                     
         except Exception as e:
@@ -53,24 +51,27 @@ class HighlightHandler:
     def remove_highlight(self, row):
         """Remove all highlights from the specified page."""
         try:
+            logger.debug(f"Attempting to remove highlights for row {row}")
+            
             page_item = self.main_window.results_table.item(row, 0)
-            color_item = self.main_window.results_table.item(row, 4)  # Changed from 2 to 4
+            color_item = self.main_window.results_table.item(row, 4)
             
             if not page_item or not color_item:
+                logger.warning(f"Missing items - page_item: {bool(page_item)}, color_item: {bool(color_item)}")
                 return
-                
-            # Parse page number from format "XXX/YYY"
-            page_num = int(page_item.text().split('/')[0])
-            xrefs = color_item.data(Qt.UserRole)
             
-            if xrefs and color_item.data(Qt.UserRole + 1):
-                logger.debug(f"Removing highlights on page {page_num}")
-                if self.main_window.pdf_handler.remove_highlight(page_num, xrefs):
-                    self.main_window.results_table.update_highlight_status(color_item, False)
-                    color_item.setData(Qt.UserRole, None)
-                    logger.info(f"Removed all highlights on page {page_num}")
-                    self.main_window.search_handler.refresh_search_results()
-                    
+            # Get the page number and search text
+            page_num = int(page_item.text().split('/')[0])
+            text = self.main_window.search_input.text().strip()
+            
+            logger.debug(f"Removing highlights for text '{text}' on page {page_num}")
+            if self.main_window.pdf_handler.remove_highlight_by_text(page_num, text):
+                self.main_window.results_table.update_highlight_status(color_item, False)
+                logger.info(f"Successfully removed highlights from page {page_num}")
+                self.main_window.search_handler.refresh_search_results()
+            else:
+                logger.warning(f"Failed to remove highlights from page {page_num}")
+                
         except Exception as e:
             logger.error(f"Error removing highlights: {traceback.format_exc()}")
 
@@ -91,13 +92,10 @@ class HighlightHandler:
         if reply == QMessageBox.Yes:
             try:
                 logger.debug("Saving PDF with highlights")
-                if self.main_window.pdf_handler.reload_document():
-                    if self.main_window.pdf_handler.save():  # Changed to use the simpler save() method
-                        logger.info(f"Successfully saved PDF to: {self.main_window.pdf_handler.filepath}")
-                    else:
-                        raise PDFError("Failed to save PDF")
+                if self.main_window.pdf_handler.save():
+                    logger.info(f"Successfully saved PDF to: {self.main_window.pdf_handler.filepath}")
                 else:
-                    raise PDFError("Failed to reload PDF before saving")
+                    raise PDFError("Failed to save PDF")
             except Exception as e:
                 self.main_window.show_error("Save Error", str(e))
                 logger.error(f"Error saving PDF: {e}")

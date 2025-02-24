@@ -191,39 +191,65 @@ class PDFHandler:
             logger.error(f"Error adding highlights: {e}")
             return None
 
-    def remove_highlight(self, page_num: int, xrefs: Optional[List[int]] = None) -> bool:
-        """Remove highlights from the specified page."""
+    def remove_highlight(self, page_num: int, xrefs: List[int]) -> bool:
+        """Remove specified highlights from the page."""
         if not self.doc:
+            logger.error("No PDF document loaded")
             return False
 
         try:
+            logger.debug(f"Removing highlights on page {page_num} with xrefs: {xrefs}")
             page = self.doc[page_num - 1]
             success = False
 
-            highlights_to_remove = []
-            for annot in page.annots():
-                if annot.type[0] == 8:  # Highlight annotation
-                    if not xrefs or annot.xref in xrefs:
-                        highlights_to_remove.append(annot.xref)
-
-            for xref in highlights_to_remove:
+            for xref in xrefs:
                 try:
                     annot = page.load_annot(xref)
-                    if annot:
+                    if annot and annot.type[0] == 8:  # Highlight annotation
                         page.delete_annot(annot)
                         success = True
+                        logger.debug(f"Removed highlight with xref {xref}")
                 except Exception as e:
                     logger.error(f"Error removing highlight {xref}: {e}")
+                    continue
 
-            if success and self.save_and_reload():
-                logger.debug(f"Successfully removed highlights from page {page_num}")
+            if success and self.save():
+                logger.debug("Successfully saved document after removing highlights")
                 return True
-
             return False
 
         except Exception as e:
             logger.error(f"Error removing highlights: {e}")
             return False
+
+    def remove_highlight_by_text(self, page_num: int, text: str) -> bool:
+        """Remove highlights from page that match the given text."""
+        if not self.doc:
+            logger.error("No PDF document loaded")
+            return False
+
+        try:
+            logger.debug(f"Removing highlights for text '{text}' on page {page_num}")
+            page = self.doc[page_num - 1]
+            success = False
+
+            # Get all highlights on the page
+            for annot in page.annots():
+                if annot.type[0] == 8:  # Highlight annotation
+                    # Check if this highlight is for our search text
+                    if annot.info.get("subject") == text:
+                        page.delete_annot(annot)
+                        success = True
+                        logger.debug(f"Removed highlight for text '{text}'")
+
+            if success and self.save():
+                logger.debug("Successfully saved document after removing highlights")
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"Error removing highlights: {e}")
+            return False   
 
     def save_and_reload(self) -> bool:
         """Save the document and reload it to ensure changes are visible."""
