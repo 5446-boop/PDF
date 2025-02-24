@@ -32,7 +32,7 @@ class MainWindow(BaseWindow):
         super().__init__()
         try:
             self.setup_logging()
-            self.pdf_handler = PDFHandler(None)  # Initialize with None or a dummy value
+            self.pdf_handler = PDFHandler()
             self.search_handler = SearchHandler(self)
             self.highlight_handler = HighlightHandler(self)
             self.setup_ui()
@@ -76,6 +76,8 @@ class MainWindow(BaseWindow):
         self.log_output.clear()
         logger.info("Log cleared")
     
+    
+    
     def setup_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle("PDF Highlighter")
@@ -110,26 +112,35 @@ class MainWindow(BaseWindow):
         about_dialog.exec_()
 
     def select_pdf(self):
-        options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select PDF File", "", "PDF Files (*.pdf);;All Files (*)", options=options)
+        """Handle PDF file selection."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select PDF File",
+            "",
+            "PDF Files (*.pdf);;All Files (*.*)"
+        )
+        
         if file_path:
-            self.load_pdf(file_path)
+            try:
+                if self.pdf_handler.load_document(file_path):
+                    self.path_label.setText(file_path)
+                    logger.info(f"Loaded PDF: {file_path}")
+                    self.results_table.setRowCount(0)
+            except PDFError as e:
+                self.show_error("PDF Error", str(e))
+                logger.error(f"Error loading PDF: {e}")
+            except Exception as e:
+                self.show_error("Error", f"Unexpected error: {str(e)}")
+                logger.error(f"Unexpected error: {e}")
 
-    def load_pdf(self, file_path):
+    def closeEvent(self, event):
+        """Handle window close event."""
         try:
-            logger.debug(f"Attempting to load PDF: {file_path}")
-            self.pdf_handler = PDFHandler(file_path)  # Initialize PDFHandler with the file path
-            if self.pdf_handler.load_document(file_path):
-                logger.debug(f"Successfully loaded PDF with {len(self.pdf_handler.doc)} pages")
-                self.path_label.setText(file_path)
-                logger.info(f"Loaded PDF: {file_path}")
-            else:
-                raise PDFError("Failed to load PDF")
+            logger.debug("Closing application")
+            if self.pdf_handler:
+                self.pdf_handler.close()
+            logger.info("Application closed successfully")
         except Exception as e:
-            error_msg = f"Error loading PDF: {str(e)}"
-            self.show_error("Load Error", error_msg)
-            logger.error(error_msg)
-
-    def show_error(self, title, message):
-        """Show an error message."""
-        QMessageBox.critical(self, title, message)
+            logger.error(f"Error during application shutdown: {e}")
+        finally:
+            super().closeEvent(event)

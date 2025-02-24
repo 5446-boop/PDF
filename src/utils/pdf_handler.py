@@ -6,102 +6,33 @@ Author: 5446-boop
 
 import logging
 import traceback
-import re
 import os
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 from pathlib import Path
-from .pdf_search import SearchResult
 import fitz  # PyMuPDF
 
 # Get module-level logger
 logger = logging.getLogger(__name__)
+
+@dataclass
+class SearchResult:
+    page_num: int
+    text: str
+    rects: List[Tuple[float, float, float, float]]
+    context: str
+    highlight_color: Optional[Tuple[float, float, float]] = None
+    annot_xrefs: List[int] = None
 
 class PDFError(Exception):
     """Custom exception for PDF operations."""
     pass
 
 class PDFHandler:
-    def __init__(self, doc):
-        self.doc = doc
-        self.highlights = {}
-
-    def search_text(self, query: str) -> List[SearchResult]:
-        """Search for text in the document."""
-        if not self.doc:
-            logger.error("No PDF document loaded")
-            raise PDFError("No PDF document loaded")
-        if not query:
-            logger.debug("Empty search query, returning empty results")
-            return []
-
-        page_results = {}
-        delivery_pattern = re.compile(r"Delivery Number: (\d+)")
-        invoice_pattern = re.compile(r"Invoice Number: (\d+)")
-        
-        try:
-            logger.debug(f"Starting search for query: '{query}'")
-            for page_num in range(len(self.doc)):
-                try:
-                    page = self.doc[page_num]
-                    matches = page.search_for(query)
-
-                    if matches:
-                        logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
-                        rects = []
-                        xrefs = []
-                        highlight_color = None
-                        delivery_number = None
-                        invoice_number = None
-
-                        for rect in matches:
-                            rects.append(tuple(rect))
-                            highlight_info = self.check_existing_highlight(page_num + 1, tuple(rect), query)
-                            if highlight_info:
-                                color, xref = highlight_info
-                                highlight_color = color
-                                xrefs.append(xref)
-
-                        expanded_rect = fitz.Rect(matches[0])
-                        expanded_rect.x0 = max(0, expanded_rect.x0 - 20)
-                        expanded_rect.x1 = min(page.rect.width, expanded_rect.x1 + 20)
-                        expanded_rect.y0 = max(0, expanded_rect.y0 - 10)
-                        expanded_rect.y1 = min(page.rect.height, expanded_rect.y1 + 10)
-                        context = page.get_text("text", clip=expanded_rect).strip()
-                        logger.debug(f"Got context for page {page_num + 1}: '{context[:50]}...'")
-                        
-                        delivery_match = delivery_pattern.search(context)
-                        if delivery_match:
-                            delivery_number = delivery_match.group(1)
-                            
-                        invoice_match = invoice_pattern.search(context)
-                        if invoice_match:
-                            invoice_number = invoice_match.group(1)
-
-                        result = SearchResult(
-                            page_num=page_num + 1,
-                            text=query,
-                            bboxes=rects,  # Changed from bboxes to rects
-                            highlight_color=highlight_color,
-                            annot_xrefs=xrefs if xrefs else None,
-                            delivery_number=delivery_number,
-                            invoice_number=invoice_number
-                        )
-                        page_results[page_num + 1] = result
-                        logger.debug(f"Added result for page {page_num + 1}")
-
-                except Exception as e:
-                    logger.warning(f"Error processing page {page_num + 1}: {e}")
-                    continue
-
-            results = list(page_results.values())
-            logger.debug(f"Search complete - found matches on {len(results)} pages")
-            return results
-
-        except Exception as e:
-            error_msg = f"Error during search: {str(e)}\n{traceback.format_exc()}"
-            logger.error(error_msg)
-            raise PDFError(f"Search failed: {str(e)}")
+    def __init__(self):
+        self.doc = None
+        self.filepath = None
+        logger.debug("PDFHandler initialized")
 
     def load_document(self, filepath: str) -> bool:
         try:
@@ -341,6 +272,69 @@ class PDFHandler:
         except Exception as e:
             logger.error(f"Error reloading document: {e}")
             return False
+
+    def search_text(self, query: str) -> List[SearchResult]:
+        """Search for text in the document."""
+        if not self.doc:
+            logger.error("No PDF document loaded")
+            raise PDFError("No PDF document loaded")
+        if not query:
+            logger.debug("Empty search query, returning empty results")
+            return []
+
+        page_results = {}
+        try:
+            logger.debug(f"Starting search for query: '{query}'")
+            for page_num in range(len(self.doc)):
+                try:
+                    page = self.doc[page_num]
+                    matches = page.search_for(query)
+
+                    if matches:
+                        logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
+                        rects = []
+                        xrefs = []
+                        highlight_color = None
+
+                        for rect in matches:
+                            rects.append(tuple(rect))
+                            highlight_info = self.check_existing_highlight(page_num + 1, tuple(rect), query)
+                            if highlight_info:
+                                color, xref = highlight_info
+                                highlight_color = color
+                                xrefs.append(xref)
+
+                        expanded_rect = fitz.Rect(matches[0])
+                        expanded_rect.x0 = max(0, expanded_rect.x0 - 20)
+                        expanded_rect.x1 = min(page.rect.width, expanded_rect.x1 + 20)
+                        expanded_rect.y0 = max(0, expanded_rect.y0 - 10)
+                        expanded_rect.y1 = min(page.rect.height, expanded_rect.y1 + 10)
+                        context = page.get_text("text", clip=expanded_rect).strip()
+                        logger.debug(f"Got context for page {page_num + 1}: '{context[:50]}...'")
+
+                        result = SearchResult(
+                            page_num=page_num + 1,
+                            text=query,
+                            rects=rects,
+                            context=context,
+                            highlight_color=highlight_color,
+                            annot_xrefs=xrefs if xrefs else None
+                        )
+                        page_results[page_num + 1] = result
+                        logger.debug(f"Added result for page {page_num + 1}")
+
+                except Exception as e:
+                    logger.warning(f"Error processing page {page_num + 1}: {e}")
+                    continue
+
+            results = list(page_results.values())
+            logger.debug(f"Search complete - found matches on {len(results)} pages")
+            return results
+
+        except Exception as e:
+            error_msg = f"Error during search: {str(e)}\n{traceback.format_exc()}"
+            logger.error(error_msg)
+            raise PDFError(f"Search failed: {str(e)}")
 
     def list_annotations(self, page_num: int):
         """List all annotations on a specific page."""

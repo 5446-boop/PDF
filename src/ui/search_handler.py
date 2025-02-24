@@ -1,3 +1,9 @@
+"""
+PDF Highlighter 2.0 - Search Handler
+Last Updated: 2025-02-23 11:38:03 UTC
+Author: 5446-boop
+"""
+
 import logging
 import traceback
 from PyQt5.QtWidgets import QTableWidgetItem
@@ -38,27 +44,18 @@ class SearchHandler:
         """Add a search result to the table."""
         try:
             # Page number
-            page_item = QTableWidgetItem(f"{result.page_num:03}/{len(self.main_window.pdf_handler.doc)}")
-            page_item.setData(Qt.UserRole, result.bboxes)  # Changed from rects to bboxes
+            page_item = QTableWidgetItem(str(result.page_num))
+            page_item.setData(Qt.UserRole, result.rects)
             page_item.setFlags(page_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 0, page_item)
             
-            # Total matches
-            found_item = QTableWidgetItem(str(len(result.bboxes)))  # Changed from rects to bboxes
+            # Found count
+            found_count = len(result.rects)
+            found_item = QTableWidgetItem(str(found_count))
             found_item.setFlags(found_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 1, found_item)
             
-            # Delivery number
-            dev_no_item = QTableWidgetItem(result.delivery_number or "N/A")
-            dev_no_item.setFlags(dev_no_item.flags() & ~Qt.ItemIsEditable)
-            self.main_window.results_table.setItem(row, 2, dev_no_item)
-            
-            # Invoice number
-            fak_no_item = QTableWidgetItem(result.invoice_number or "N/A")
-            fak_no_item.setFlags(fak_no_item.flags() & ~Qt.ItemIsEditable)
-            self.main_window.results_table.setItem(row, 3, fak_no_item)
-            
-            # Highlight color
+            # Color status
             color_item = QTableWidgetItem()
             color_item.setFlags(Qt.ItemIsEnabled)
             self.main_window.results_table.update_highlight_status(
@@ -68,23 +65,22 @@ class SearchHandler:
             )
             if result.annot_xrefs:
                 color_item.setData(Qt.UserRole, result.annot_xrefs)
-            self.main_window.results_table.setItem(row, 4, color_item)
+            self.main_window.results_table.setItem(row, 2, color_item)
             
-            # Highlight button
-            highlight_btn = self.main_window.results_table.create_action_button("Highlight")
+            # Buttons
+            highlight_btn = self.main_window.results_table.create_action_button("Highlight All")
             highlight_btn.clicked.connect(
                 lambda: self.main_window.highlight_handler.add_highlight(row, result.text)
             )
-            self.main_window.results_table.setCellWidget(row, 5, highlight_btn)
+            self.main_window.results_table.setCellWidget(row, 3, highlight_btn)
             
-            # Remove button
-            remove_btn = self.main_window.results_table.create_action_button("Remove")
+            remove_btn = self.main_window.results_table.create_action_button("Remove All")
             remove_btn.clicked.connect(
                 lambda: self.main_window.highlight_handler.remove_highlight(row)
             )
-            self.main_window.results_table.setCellWidget(row, 6, remove_btn)
+            self.main_window.results_table.setCellWidget(row, 4, remove_btn)
             
-            logger.debug(f"Added result for page {result.page_num} with {len(result.bboxes)} matches")  # Changed from rects to bboxes
+            logger.debug(f"Added result for page {result.page_num} with {found_count} matches")
             
         except Exception as e:
             logger.error(f"Error adding result to table: {traceback.format_exc()}")
