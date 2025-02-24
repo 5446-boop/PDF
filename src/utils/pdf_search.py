@@ -1,6 +1,6 @@
 """
 PDF Highlighter 2.0 - PDF Search Engine
-Last Updated: 2025-02-22 22:21:40 UTC
+Last Updated: 2025-02-24 17:32:37 UTC
 """
 
 import logging
@@ -21,7 +21,7 @@ class SearchResult:
     """Data class for search results."""
     page_num: int
     text: str
-    rects: List[Tuple[float, float, float, float]]  # List of rectangles where text is found
+    bboxes: List[Tuple[float, float, float, float]]  # List of rectangles where text is found
     highlight_color: Optional[Tuple[float, float, float]] = None  # RGB values
     annot_xrefs: Optional[List[int]] = None  # List of references to the PDF annotations
     delivery_number: Optional[str] = None  # Delivery number if found

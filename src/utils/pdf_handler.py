@@ -90,7 +90,7 @@ class PDFHandler:
                         result = SearchResult(
                             page_num=page_num + 1,
                             text=query,
-                            rects=rects,
+                            bboxes=bboxes,
                             highlight_color=highlight_color,
                             annot_xrefs=xrefs if xrefs else None,
                             delivery_number=delivery_number,
