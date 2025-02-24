@@ -1,16 +1,16 @@
 """
 PDF Highlighter 2.0 - PDF Handler
-Last Updated: 2025-02-24 18:27:19 UTC
+Last Updated: 2025-02-24 19:01:23 UTC
 Author: 5446-boop
 """
 
 import logging
 import traceback
 import os
+import re
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 from pathlib import Path
-import re
 import fitz  # PyMuPDF
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,8 @@ class SearchResult:
     invoice_number: Optional[str] = None
 
     def format_page_number(self, total_pages: int) -> str:
-        """Format page number as XXX/YYY."""
-        return f"{self.page_num:03d}/{total_pages:03d}"
+        """Format the page number as 'current/total'"""
+        return f"{self.page_num}/{total_pages}"
 
 class PDFError(Exception):
     """Custom exception for PDF operations."""
@@ -39,34 +39,61 @@ class PDFHandler:
     def __init__(self):
         self.doc = None
         self.filepath = None
-        # Compile regex patterns once at initialization for better performance
-        self._compile_search_patterns()
-        logger.debug("PDFHandler initialized")
-    
-    def _compile_search_patterns(self):
-        """Compile regex patterns for invoice and delivery numbers."""
-        # More comprehensive patterns for invoice number detection
-        invoice_patterns = [
-            r"Invoice[:\s]*(?:No\.?|Number:?|#)?\s*(\d{5,12})",  # Basic format
-            r"Rechnung(?:s-?(?:nr\.?|nummer:?))?\s*(\d{5,12})",  # German format
-            r"Fak(?:tura)?\.?\s*(?:nr\.?|number:?)?\s*(\d{5,12})",  # Alternative format
-            r"(?:Bill|Invoice)\s*(?:#|No\.?|Number:?)?\s*[:\s]?\s*(\d{5,12})",  # Extended format
-            r"(?<!\d)(\d{10})(?!\d)",  # Standalone 10-digit number
-            r"F\d{2}-(\d{5,12})",  # F-prefixed format
-            r"R\d{2}-(\d{5,12})"   # R-prefixed format
-        ]
         
-        # Combine patterns into a single regex with named groups
-        self.invoice_pattern = re.compile(
-            '|'.join(f'(?P<inv{i}>{pattern})' for i, pattern in enumerate(invoice_patterns)),
-            re.IGNORECASE | re.MULTILINE
-        )
-        
+        # Keep both patterns
         self.delivery_pattern = re.compile(
             r"Delivery(?:[-\s])?(?:No\.?|Number:?|#)?\s*(\d{5,12})",
             re.IGNORECASE | re.MULTILINE
         )
-        logger.debug("Search patterns compiled")
+        self.number_pattern = re.compile(r'\d{8}')
+        logger.debug("PDFHandler initialized with dual pattern detection")
+
+    def _extract_invoice_number(self, page) -> Optional[str]:
+        """Extract the second 8-digit number found on the page."""
+        try:
+            # Get all text from the page
+            text = page.get_text()
+            
+            # Find all 8-digit numbers
+            matches = self.number_pattern.findall(text)
+            logger.debug(f"Found {len(matches)} 8-digit numbers: {matches}")
+            
+            # If we found at least two numbers
+            if len(matches) >= 2:
+                invoice_num = matches[1]  # Get the second number
+                logger.debug(f"Using second 8-digit number as invoice number: {invoice_num}")
+                return invoice_num
+            elif len(matches) == 1:
+                logger.debug(f"Found only one 8-digit number: {matches[0]}")
+                return matches[0]
+            else:
+                logger.debug("No 8-digit numbers found")
+                return None
+
+        except Exception as e:
+            logger.warning(f"Error extracting invoice number: {str(e)}\nTraceback:\n{traceback.format_exc()}")
+            return None
+
+    def process_page(self, page, query):
+        """Process a page for highlighting."""
+        try:
+            text = page.get_text()
+            matches = self.number_pattern.findall(text)
+            
+            if len(matches) >= 2:
+                invoice_num = matches[1]  # Get the second number
+                if query.lower() in invoice_num.lower():
+                    # Create highlight for the found number
+                    instances = []
+                    text_instances = page.search_for(invoice_num)
+                    if text_instances:
+                        instances.extend(text_instances)
+                    return instances
+            return []
+
+        except Exception as e:
+            logger.warning(f"Error processing page {page.number}: {str(e)}")
+            return []
 
     def search_text(self, query: str) -> List[SearchResult]:
         """Search for text in the document."""
@@ -82,21 +109,8 @@ class PDFHandler:
                     matches = page.search_for(query)
 
                     if matches:
-                        # Get text in different formats for better extraction
-                        page_text = page.get_text("text")  # Standard text
-                        page_blocks = page.get_text("blocks")  # Text blocks with positioning
-                        page_dict = page.get_text("dict")  # Detailed text information
-                        
-                        # Find invoice number using multiple approaches
-                        invoice_number = self._extract_invoice_number(
-                            page_text, 
-                            page_blocks, 
-                            page_dict,
-                            matches[0]  # Use first match position as reference
-                        )
-                        
-                        # Find delivery number (keeping existing logic)
-                        delivery_match = self.delivery_pattern.search(page_text)
+                        invoice_number = self._extract_invoice_number(page)
+                        delivery_match = self.delivery_pattern.search(page.get_text("text"))
                         
                         result = SearchResult(
                             page_num=page_num + 1,
@@ -108,11 +122,7 @@ class PDFHandler:
                             delivery_number=delivery_match.group(1) if delivery_match else None,
                             invoice_number=invoice_number
                         )
-                        
                         page_results.append(result)
-                        logger.debug(f"Found {len(matches)} matches on page {page_num + 1}")
-                        if invoice_number:
-                            logger.debug(f"Found invoice number: {invoice_number}")
 
                 except Exception as e:
                     logger.warning(f"Error processing page {page_num + 1}: {e}")
@@ -125,64 +135,60 @@ class PDFHandler:
             logger.error(f"Search error: {str(e)}")
             return []
 
-    def _extract_invoice_number(self, text: str, blocks: list, text_dict: dict, match_pos: tuple) -> Optional[str]:
-        """
-        Extract invoice number using multiple approaches for better reliability.
-        
-        Args:
-            text: Raw text content of the page
-            blocks: Text blocks with positioning information
-            text_dict: Detailed text information dictionary
-            match_pos: Position of the search match (for proximity search)
-            
-        Returns:
-            Optional[str]: Extracted invoice number or None if not found
-        """
-        try:
-            # Method 1: Pattern matching on full text
-            for match in self.invoice_pattern.finditer(text):
-                # Get the first non-None group (the actual number)
-                groups = match.groups()
-                for group in groups:
-                    if group:
-                        return group
-
-            # Method 2: Search in nearby blocks
-            match_x, match_y = match_pos[0], match_pos[1]  # Use first match position
-            nearby_text = ""
-            
-            for block in blocks:
-                # Check if block is near the match position (within 200 points)
-                if isinstance(block, (tuple, list)) and len(block) >= 6:
-                    block_x, block_y = block[0], block[1]
-                    if abs(block_x - match_x) < 200 and abs(block_y - match_y) < 200:
-                        nearby_text += block[4] if len(block) > 4 else ""
-
-            # Search in nearby text
-            if nearby_text:
-                for match in self.invoice_pattern.finditer(nearby_text):
-                    groups = match.groups()
-                    for group in groups:
-                        if group:
-                            return group
-
-            # Method 3: Look for standalone numbers in the right format
-            number_pattern = re.compile(r'(?<!\d)(\d{10})(?!\d)')  # Standalone 10-digit number
-            for match in number_pattern.finditer(text):
-                return match.group(1)
-
+    def highlight_text(self, page_num: int, bboxes: List[Tuple[float, float, float, float]], 
+                      color: Tuple[float, float, float], query: str) -> Optional[List[int]]:
+        """Add highlights to text on the specified page."""
+        if not self.doc:
             return None
+
+        xrefs = []
+        try:
+            page = self.doc[page_num - 1]
+            for rect in bboxes:
+                annot = page.add_highlight_annot(fitz.Rect(rect))
+                if annot:
+                    annot.set_colors(stroke=color)
+                    annot.set_opacity(0.5)
+                    annot.update()
+                    xrefs.append(annot.xref)
+            
+            return xrefs if self.save() else None
 
         except Exception as e:
-            logger.warning(f"Error extracting invoice number: {e}")
+            logger.error(f"Error adding highlights: {e}")
             return None
+
+    def remove_highlight_by_text(self, page_num: int, text: str) -> bool:
+        """Remove highlights for specific text on a page."""
+        try:
+            if not self.doc or page_num < 1:
+                return False
+
+            page = self.doc[page_num - 1]
+            found = False
+
+            for annot in page.annots():
+                if annot.type[0] == 8:  # Highlight annotation
+                    # Get the highlighted text
+                    highlighted_text = annot.info["content"] if "content" in annot.info else ""
+                    if text in highlighted_text or not highlighted_text:
+                        page.delete_annot(annot)
+                        found = True
+
+            if found:
+                return self.save()
+            return False
+
+        except Exception as e:
+            logger.error(f"Error removing highlights: {e}")
+            return False
 
     def load_document(self, filepath: str) -> bool:
         """Load a PDF document from the specified filepath."""
         try:
             self.close()
             logger.debug(f"Attempting to load PDF: {filepath}")
-
+            
             filepath = Path(filepath)
             if not filepath.is_file():
                 logger.error(f"File not found: {filepath}")
@@ -190,12 +196,7 @@ class PDFHandler:
 
             self.doc = fitz.open(filepath)
             self.filepath = str(filepath)
-
-            total_pages = len(self.doc)
-            if total_pages > 0:
-                _ = self.doc[0].get_text("text")  # Verify document is readable
-
-            logger.debug(f"Successfully loaded PDF with {total_pages} pages")
+            logger.debug(f"Successfully loaded PDF with {len(self.doc)} pages")
             return True
 
         except Exception as e:
@@ -224,15 +225,7 @@ class PDFHandler:
             temp_path = f"{full_path}.temp"
             original_doc = self.doc
 
-            self.doc.save(
-                temp_path,
-                garbage=0,
-                deflate=True,
-                clean=False,
-                pretty=False,
-                linear=True
-            )
-
+            self.doc.save(temp_path, garbage=0, deflate=True, clean=False)
             self.doc.close()
             self.doc = None
 
@@ -250,115 +243,6 @@ class PDFHandler:
                 self.doc = original_doc
             return False
 
-    def highlight_text(self, page_num: int, rects: List[Tuple[float, float, float, float]], 
-                      color: Tuple[float, float, float], query: str) -> Optional[List[int]]:
-        """Add highlights to text on the specified page."""
-        if not self.doc:
-            return None
-
-        xrefs = []
-        try:
-            logger.debug(f"Adding highlights on page {page_num} for query: '{query}'")
-            page = self.doc[page_num - 1]
-            
-            for rect in rects:
-                annot = page.add_highlight_annot(fitz.Rect(rect))
-                if annot and annot.type[0] == 8:  # Verify it's a highlight annotation
-                    annot.set_colors(stroke=color)
-                    annot.set_opacity(0.5)
-                    annot.set_info({"subject": query, "title": "Highlight"})
-                    annot.update()
-                    if page.load_annot(annot.xref):
-                        xrefs.append(annot.xref)
-            
-            if xrefs and self.save_and_reload():
-                logger.debug(f"Successfully added {len(xrefs)} highlights")
-                return xrefs
-            
-            return None
-
-        except Exception as e:
-            logger.error(f"Error adding highlights: {e}")
-            return None
-
-    def remove_highlight(self, page_num: int, xrefs: List[int]) -> bool:
-        """Remove specified highlights from the page."""
-        if not self.doc:
-            logger.error("No PDF document loaded")
-            return False
-
-        try:
-            logger.debug(f"Removing highlights on page {page_num} with xrefs: {xrefs}")
-            page = self.doc[page_num - 1]
-            success = False
-
-            for xref in xrefs:
-                try:
-                    annot = page.load_annot(xref)
-                    if annot and annot.type[0] == 8:  # Highlight annotation
-                        page.delete_annot(annot)
-                        success = True
-                        logger.debug(f"Removed highlight with xref {xref}")
-                except Exception as e:
-                    logger.error(f"Error removing highlight {xref}: {e}")
-                    continue
-
-            if success and self.save():
-                logger.debug("Successfully saved document after removing highlights")
-                return True
-            return False
-
-        except Exception as e:
-            logger.error(f"Error removing highlights: {e}")
-            return False
-
-    def remove_highlight_by_text(self, page_num: int, text: str) -> bool:
-        """Remove highlights from page that match the given text."""
-        if not self.doc:
-            logger.error("No PDF document loaded")
-            return False
-
-        try:
-            logger.debug(f"Removing highlights for text '{text}' on page {page_num}")
-            page = self.doc[page_num - 1]
-            success = False
-
-            # Get all highlights on the page
-            for annot in page.annots():
-                if annot.type[0] == 8:  # Highlight annotation
-                    # Check if this highlight is for our search text
-                    if annot.info.get("subject") == text:
-                        page.delete_annot(annot)
-                        success = True
-                        logger.debug(f"Removed highlight for text '{text}'")
-
-            if success and self.save():
-                logger.debug("Successfully saved document after removing highlights")
-                return True
-            return False
-
-        except Exception as e:
-            logger.error(f"Error removing highlights: {e}")
-            return False   
-
-    def save_and_reload(self) -> bool:
-        """Save the document and reload it to ensure changes are visible."""
-        return self.save() and self.reload_document() if self.filepath else False
-
-    def reload_document(self) -> bool:
-        """Reload the current document to refresh its state."""
-        if not self.filepath:
-            return False
-        try:
-            current_path = self.filepath
-            self.doc.close()
-            self.doc = fitz.open(current_path)
-            logger.debug("Document successfully reloaded")
-            return True
-        except Exception as e:
-            logger.error(f"Error reloading document: {e}")
-            return False
-
     def close(self) -> None:
         """Close and clean up the document."""
         try:
@@ -372,5 +256,3 @@ class PDFHandler:
     def __del__(self):
         """Ensure document is closed when object is destroyed."""
         self.close()
-
-__all__ = ['PDFHandler', 'PDFError', 'SearchResult']
