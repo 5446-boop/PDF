@@ -1,4 +1,5 @@
 import logging
+import traceback
 from PyQt5.QtWidgets import QTableWidgetItem
 from PyQt5.QtCore import Qt
 
@@ -38,12 +39,12 @@ class SearchHandler:
         try:
             # Page number
             page_item = QTableWidgetItem(f"{result.page_num:03}/{len(self.main_window.pdf_handler.doc)}")
-            page_item.setData(Qt.UserRole, result.rects)
+            page_item.setData(Qt.UserRole, result.bboxes)  # Changed from rects to bboxes
             page_item.setFlags(page_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 0, page_item)
             
             # Total matches
-            found_item = QTableWidgetItem(str(len(result.rects)))
+            found_item = QTableWidgetItem(str(len(result.bboxes)))  # Changed from rects to bboxes
             found_item.setFlags(found_item.flags() & ~Qt.ItemIsEditable)
             self.main_window.results_table.setItem(row, 1, found_item)
             
@@ -83,7 +84,7 @@ class SearchHandler:
             )
             self.main_window.results_table.setCellWidget(row, 6, remove_btn)
             
-            logger.debug(f"Added result for page {result.page_num} with {len(result.rects)} matches")
+            logger.debug(f"Added result for page {result.page_num} with {len(result.bboxes)} matches")  # Changed from rects to bboxes
             
         except Exception as e:
             logger.error(f"Error adding result to table: {traceback.format_exc()}")

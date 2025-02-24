@@ -17,15 +17,6 @@ import fitz  # PyMuPDF
 # Get module-level logger
 logger = logging.getLogger(__name__)
 
-@dataclass
-class SearchResult:
-    page_num: int
-    text: str
-    rects: List[Tuple[float, float, float, float]]
-    context: str
-    highlight_color: Optional[Tuple[float, float, float]] = None
-    annot_xrefs: List[int] = None
-
 class PDFError(Exception):
     """Custom exception for PDF operations."""
     pass
@@ -90,7 +81,7 @@ class PDFHandler:
                         result = SearchResult(
                             page_num=page_num + 1,
                             text=query,
-                            bboxes=bboxes,
+                            bboxes=rects,  # Changed from bboxes to rects
                             highlight_color=highlight_color,
                             annot_xrefs=xrefs if xrefs else None,
                             delivery_number=delivery_number,
