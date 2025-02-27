@@ -144,14 +144,45 @@ class PDFHandler:
         xrefs = []
         try:
             page = self.doc[page_num - 1]
+            
+            # Get current date and time in UTC
+            import datetime
+            now = datetime.datetime.now()
+            date_str = now.strftime("%Y-%m-%d")
+            time_str = now.strftime("%H:%M:%S")
+            timestamp = f"{date_str}\n{time_str}"  # Put time under the date
+            
             for rect in bboxes:
+                # Create the highlight annotation (preserve original functionality)
                 annot = page.add_highlight_annot(fitz.Rect(rect))
                 if annot:
                     annot.set_colors(stroke=color)
-                    annot.set_opacity(0.5)
+                    annot.set_opacity(1)
                     annot.update()
                     xrefs.append(annot.xref)
+                    
+                    # Add timestamp as a free text annotation to the right of the highlight
+                    timestamp_rect = fitz.Rect(
+                        rect[2] + 5,           # 5 points to the right of highlight's right edge
+                        rect[1] - 3,           # Slightly above highlight to be more visible
+                        rect[2] + 120,         # Width for timestamp
+                        rect[1] + 12           # Height for timestamp
+                    )
+                    
+                    timestamp_annot = page.add_freetext_annot(
+                        timestamp_rect,
+                        timestamp,
+                        fontsize=5,            # Small but visible font
+                        fontname="Helvetica",
+                        text_color=(1, 0, 0),  # Black text
+                        fill_color=None # Light yellow background
+                    )
+                    
+                    timestamp_annot.set_border(width=0)  # No border
+                    timestamp_annot.update()
+                    xrefs.append(timestamp_annot.xref)
             
+            # Preserve original behavior - save the document and return xrefs
             return xrefs if self.save() else None
 
         except Exception as e:
